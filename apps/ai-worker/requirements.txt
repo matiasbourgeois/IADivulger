@@ -1,0 +1,22 @@
+# ─── Web Framework ───────────────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+
+# ─── Data Validation ─────────────────────────────────────────────────────────
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# ─── HTTP & WebSocket Clients ────────────────────────────────────────────────
+httpx==0.27.0          # async HTTP client (replaces requests)
+websockets==12.0       # async WebSocket support for ComfyUI polling
+
+# ─── Async utilities ─────────────────────────────────────────────────────────
+anyio==4.3.0
+aiofiles==23.2.1       # async file I/O for saving assets
+
+# ─── Config & Logging ────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+loguru==0.7.2          # beautiful structured logging
+
+# ─── Audio utilities (optional, for WAV verification) ────────────────────────
+# soundfile==0.12.1

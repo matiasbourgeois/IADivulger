@@ -1,0 +1,34 @@
+{
+  "projectId": "123e4567-e89b-12d3-a456-426614174000",
+  "title": "Historia de la Inteligencia Artificial",
+  "targetDuration": 60,
+  "formats": ["16:9", "9:16"],
+  "script": {
+    "scenes": [
+      {
+        "sceneId": "s1",
+        "narration": "Hace décadas, la IA era solo ciencia ficción.",
+        "visualPrompt": "Cinematic shot of an old 1950s computer room, black and white, dramatic lighting",
+        "durationSeconds": 5,
+        "voiceOptions": {
+          "speed": 1.0,
+          "language": "es"
+        }
+      },
+      {
+        "sceneId": "s2",
+        "narration": "Hoy, modelos gigantescos procesan datos en milisegundos para entender el mundo.",
+        "visualPrompt": "Abstract visualization of neural networks glowing in a vast server room, cyberpunk style",
+        "durationSeconds": 8,
+        "voiceOptions": {
+          "speed": 1.0,
+          "language": "es"
+        }
+      }
+    ]
+  },
+  "metadata": {
+    "createdAt": "2026-03-14T10:00:00Z",
+    "requestedBy": "admin"
+  }
+}

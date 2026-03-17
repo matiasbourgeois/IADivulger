@@ -1,0 +1,268 @@
+[
+  {
+    "id": "zombie-survival-003",
+    "status": "COMPLETED",
+    "payload": {
+      "projectId": "zombie-survival",
+      "title": "Zombie Survival Cinematic",
+      "targetDuration": 30,
+      "formats": [
+        "16:9"
+      ],
+      "script": {
+        "scenes": [
+          {
+            "sceneId": "s1",
+            "narration": "El apocalipsis zombie ha llegado, la ciudad esta en llamas.",
+            "visualPrompt": "Cinematic wide shot of a burning city, zombies wandering the streets, 4k, moody lighting.",
+            "durationSeconds": 5.36,
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            },
+            "assetUrl": "http://localhost:3001/api/assets/IADivulger_Wan_00003.mp4",
+            "audioUrl": "http://localhost:3001/api/assets/internal/audio/narration_zombie-narration-003_1773641189899.wav"
+          }
+        ]
+      },
+      "metadata": {
+        "createdAt": "2026-03-16T02:00:00.000Z",
+        "requestedBy": "user"
+      }
+    },
+    "createdAt": "2026-03-16T02:00:00.000Z",
+    "updatedAt": "2026-03-16T02:15:00.000Z",
+    "progress": 100,
+    "finalVideoUrl": "http://localhost:3001/outputs/final_zombie-survival_1773641432828.mp4"
+  },
+  {
+    "id": "bf8f949e-1410-41c1-a6f1-e112508750f8",
+    "status": "COMPLETED",
+    "payload": {
+      "projectId": "ac28b9da-625f-4566-8e2a-5aca255b485b",
+      "title": "A super cute bunny, jumping happily",
+      "targetDuration": 30,
+      "formats": [
+        "16:9"
+      ],
+      "script": {
+        "scenes": [
+          {
+            "sceneId": "s2",
+            "narration": "A super cute bunny is jumping happily in a beautiful garden.",
+            "visualPrompt": "A super cute bunny, jumping happily, cinematic lighting, 4k, masterpiece, highly detailed",
+            "durationSeconds": 5,
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            },
+            "audioPath": "http://localhost:8000/assets/audio/narration_s2_1773709983585.wav",
+            "audioUrl": "http://localhost:8000/assets/audio/narration_s2_1773709983585.wav",
+            "assetPath": "video/scene_s2.mp4",
+            "assetUrl": "http://localhost:8000/assets/video/scene_s2.mp4"
+          }
+        ]
+      }
+    },
+    "createdAt": "2026-03-16T12:59:37.069Z",
+    "updatedAt": "2026-03-17T13:02:43.495Z",
+    "progress": 100,
+    "finalVideoUrl": "http://localhost:8000/assets/video/scene_s2.mp4"
+  },
+  {
+    "id": "b60004c8-00ba-4069-a45d-b3a4f0a1c6ab",
+    "status": "COMPLETED",
+    "payload": {
+      "projectId": "c740263e-e020-4421-b4e7-e790857d8533",
+      "title": "La Historia de Historia de la Inteligencia Artificial",
+      "description": "Un recorrido fascinante por Historia de la Inteligencia Artificial, explorando sus orígenes, evolución y futuro.",
+      "targetDuration": 600,
+      "formats": [
+        "16:9"
+      ],
+      "language": "es",
+      "script": {
+        "scenes": [
+          {
+            "sceneId": "s1",
+            "type": "presentation",
+            "narration": "Bienvenidos a este video sobre Historia de la Inteligencia Artificial. Hoy vamos a explorar uno de los temas más fascinantes de nuestra era. Prepárate para un viaje que cambiará la forma en que ves el mundo.",
+            "durationSeconds": 35,
+            "slide": {
+              "headline": "La Historia de\nHistoria de la Inteligencia Artificial",
+              "style": "title",
+              "backgroundColor": "#020617",
+              "accentColor": "#6366f1"
+            },
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            },
+            "audioUrl": "http://localhost:3001/audio/narration_s1_1773785768535.wav",
+            "audioPath": "http://localhost:3001/audio/narration_s1_1773785768535.wav"
+          },
+          {
+            "sceneId": "s2",
+            "type": "video",
+            "narration": "Los orígenes de todo empiezan con una idea.",
+            "durationSeconds": 8,
+            "visualPrompt": "Cinematic establishing shot, dramatic lighting, symbolizing the beginning of Historia de la Inteligencia Artificial, ultra-detailed, 8K, professional cinematography",
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            },
+            "assetPath": "video/scene_s2.mp4",
+            "assetUrl": "http://localhost:8000/assets/video/scene_s2.mp4",
+            "audioUrl": "http://localhost:3001/audio/narration_s2_1773785785549.wav",
+            "audioPath": "http://localhost:3001/audio/narration_s2_1773785785549.wav"
+          },
+          {
+            "sceneId": "s3",
+            "type": "presentation",
+            "narration": "Para entender dónde estamos hoy, necesitamos remontarnos al principio. Los primeros pasos fueron modestos, pero sentaron las bases de todo lo que vendría después.",
+            "durationSeconds": 42,
+            "slide": {
+              "headline": "Los Orígenes",
+              "bulletPoints": [
+                "Primera etapa",
+                "Descubrimientos clave",
+                "Los pioneros",
+                "El momento decisivo"
+              ],
+              "style": "bullets",
+              "backgroundColor": "#0f172a",
+              "accentColor": "#3b82f6"
+            },
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            },
+            "audioUrl": "http://localhost:3001/audio/narration_s3_1773785843180.wav",
+            "audioPath": "http://localhost:3001/audio/narration_s3_1773785843180.wav"
+          },
+          {
+            "sceneId": "s4",
+            "type": "presentation",
+            "narration": "Los números hablan por sí solos.",
+            "durationSeconds": 30,
+            "slide": {
+              "headline": "+10 Años de Evolución",
+              "statValue": "10x",
+              "statLabel": "Crecimiento en la última década",
+              "style": "stats",
+              "backgroundColor": "#1e1b4b",
+              "accentColor": "#a855f7"
+            },
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            },
+            "audioUrl": "http://localhost:3001/audio/narration_s4_1773785856904.wav",
+            "audioPath": "http://localhost:3001/audio/narration_s4_1773785856904.wav"
+          },
+          {
+            "sceneId": "s5",
+            "type": "video",
+            "narration": "La transformación fue imparable.",
+            "durationSeconds": 7,
+            "visualPrompt": "Dramatic time-lapse visualization of rapid transformation and growth, professional cinema quality, dark moody aesthetic, neon highlights",
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            },
+            "assetPath": "video/scene_s5.mp4",
+            "assetUrl": "http://localhost:8000/assets/video/scene_s5.mp4",
+            "audioUrl": "http://localhost:3001/audio/narration_s5_1773785873026.wav",
+            "audioPath": "http://localhost:3001/audio/narration_s5_1773785873026.wav"
+          },
+          {
+            "sceneId": "s6",
+            "type": "presentation",
+            "narration": "Hoy, Historia de la Inteligencia Artificial es parte de nuestras vidas de formas que nunca imaginamos. Está en nuestros teléfonos, en nuestras ciudades, en nuestra forma de trabajar y de relacionarnos.",
+            "durationSeconds": 38,
+            "slide": {
+              "headline": "El Presente",
+              "bodyText": "Historia de la Inteligencia Artificial ha transformado completamente la sociedad moderna.",
+              "bulletPoints": [
+                "Impacto económico global",
+                "Cambio en comportamiento humano",
+                "Nuevas industrias emergentes"
+              ],
+              "style": "bullets",
+              "backgroundColor": "#042f2e",
+              "accentColor": "#10b981"
+            },
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            },
+            "audioUrl": "http://localhost:3001/audio/narration_s6_1773785929509.wav",
+            "audioPath": "http://localhost:3001/audio/narration_s6_1773785929509.wav"
+          },
+          {
+            "sceneId": "s7",
+            "type": "presentation",
+            "narration": "¿Y el futuro? Solo estamos viendo el comienzo.",
+            "durationSeconds": 32,
+            "slide": {
+              "headline": "\"El futuro ya está aquí,\nsolo que no está distribuido uniformemente.\"",
+              "bodyText": "— William Gibson",
+              "style": "quote",
+              "backgroundColor": "#1c0533",
+              "accentColor": "#ec4899"
+            },
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            },
+            "audioUrl": "http://localhost:3001/audio/narration_s7_1773785942058.wav",
+            "audioPath": "http://localhost:3001/audio/narration_s7_1773785942058.wav"
+          },
+          {
+            "sceneId": "s8",
+            "type": "video",
+            "narration": "El futuro nos espera. La pregunta es: ¿estás listo?",
+            "durationSeconds": 9,
+            "visualPrompt": "Futuristic utopian cityscape, golden hour lighting, technology and nature coexisting, cinematic aerial shot, incredibly detailed, masterpiece quality",
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            },
+            "assetPath": "video/scene_s8.mp4",
+            "assetUrl": "http://localhost:8000/assets/video/scene_s8.mp4",
+            "audioUrl": "http://localhost:3001/audio/narration_s8_1773785964825.wav",
+            "audioPath": "http://localhost:3001/audio/narration_s8_1773785964825.wav"
+          },
+          {
+            "sceneId": "s9",
+            "type": "presentation",
+            "narration": "Gracias por acompañarnos en este recorrido. Si te gustó este video, suscríbete y activa las notificaciones para no perderte ningún episodio.",
+            "durationSeconds": 28,
+            "slide": {
+              "headline": "¿Te gustó?\nSuscríbete",
+              "style": "transition",
+              "backgroundColor": "#020617",
+              "accentColor": "#6366f1"
+            },
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            },
+            "audioUrl": "http://localhost:3001/audio/narration_s9_1773786008902.wav",
+            "audioPath": "http://localhost:3001/audio/narration_s9_1773786008902.wav"
+          }
+        ]
+      },
+      "metadata": {
+        "createdAt": "2026-03-17T14:42:13.967Z",
+        "requestedBy": "dashboard",
+        "topic": "Historia de la Inteligencia Artificial",
+        "generatedByLLM": false
+      }
+    },
+    "createdAt": "2026-03-17T14:42:13.968Z",
+    "updatedAt": "2026-03-17T23:11:44.961Z",
+    "progress": 100,
+    "finalVideoUrl": "http://localhost:3001/outputs/final_c740263e-e020-4421-b4e7-e790857d8533_1773788697830.mp4"
+  }
+]
