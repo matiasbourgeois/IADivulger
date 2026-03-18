@@ -42,11 +42,12 @@ export class JobManager {
       jobsList.forEach(job => {
         job.createdAt = new Date(job.createdAt);
         job.updatedAt = new Date(job.updatedAt);
+        // Reset zombie in-progress jobs — put them back to AWAITING_REVIEW so user can re-approve
         if (job.status === JobStatus.GENERATING_ASSETS || job.status === JobStatus.RENDERING) {
-          console.log(`[JobManager] Resetting zombie job ${job.id} from ${job.status} → PENDING`);
-          job.status = JobStatus.PENDING;
+          console.log(`[JobManager] Resetting zombie job ${job.id} from ${job.status} → AWAITING_REVIEW`);
+          job.status = JobStatus.AWAITING_REVIEW;
           job.progress = 0;
-          job.error = undefined;
+          job.error = 'Pipeline interrupted (server restart). Re-approve to resume.';
           zombiesReset++;
         }
         this.jobs.set(job.id, job);
@@ -68,17 +69,21 @@ export class JobManager {
 
   // ─── CRUD ─────────────────────────────────────────────────────────────────
 
-  public createJob(payload: ProjectPayload): Job {
+  public createJob(payload: ProjectPayload, initialStatus: JobStatus = JobStatus.PENDING): Job {
     const now = new Date();
     const job: Job = {
       id: uuidv4(),
-      status: JobStatus.PENDING,
+      status: initialStatus,
       payload,
       createdAt: now,
       updatedAt: now,
     };
     this.jobs.set(job.id, job);
     this.saveJobs();
+    // Only start the pipeline immediately if created as PENDING
+    if (initialStatus === JobStatus.PENDING) {
+      this.updateStatus(job.id, JobStatus.GENERATING_ASSETS);
+    }
     return job;
   }
 
@@ -140,7 +145,10 @@ export class JobManager {
     this.saveJobs();
     console.log(`[JobManager] Job ${id} status → ${status}`);
 
-    if (status === JobStatus.GENERATING_ASSETS) {
+    // Start the pipeline when job is approved (PENDING → GENERATING_ASSETS)
+    if (status === JobStatus.PENDING) {
+      this.updateStatus(id, JobStatus.GENERATING_ASSETS);
+    } else if (status === JobStatus.GENERATING_ASSETS) {
       this.processJob(id).catch(err => {
         console.error(`[JobManager] Pipeline error for ${id}:`, err);
         this.updateStatus(id, JobStatus.FAILED, err.message);
@@ -163,6 +171,20 @@ export class JobManager {
     console.log(`[JobManager] ${totalScenes} scenes total: ${videoScenes} video, ${totalScenes - videoScenes} presentation`);
 
     let videoScenesDone = 0;
+
+    // ── TTS Health Check ──────────────────────────────────────────────────────
+    const TTS_URL = process.env.QWEN_TTS_URL || 'http://127.0.0.1:9000';
+    let ttsOnline = false;
+    try {
+      const ttsHealth = await fetch(`${TTS_URL}/health`, { signal: AbortSignal.timeout(3000) });
+      ttsOnline = ttsHealth.ok;
+    } catch (_) {}
+    if (!ttsOnline) {
+      console.warn(`[JobManager] ⚠ TTS server is OFFLINE at ${TTS_URL}. Videos will have no audio.`);
+      console.warn(`[JobManager] → Start it with: cd apps/tts-server && .venv\\Scripts\\python.exe -m uvicorn main:app --port 9000`);
+    } else {
+      console.log(`[JobManager] ✅ TTS server online at ${TTS_URL}`);
+    }
 
     for (let i = 0; i < totalScenes; i++) {
       const scene = scenes[i];

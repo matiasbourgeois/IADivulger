@@ -7,8 +7,41 @@ export const jobRouter = Router();
 const jobManager = JobManager.getInstance();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /api/jobs/generate  — LLM generates script → creates job → returns it
-// Body: { topic: string, durationMinutes?: number, language?: 'es'|'en' }
+// POST /api/jobs/preview  — Generate a script preview WITHOUT creating a job
+// Returns the raw script for the user to review in the dashboard.
+// Body: { topic, durationMinutes?, language? }
+// ─────────────────────────────────────────────────────────────────────────────
+jobRouter.post('/preview', async (req: Request, res: Response) => {
+  const { topic, durationMinutes = 10, language = 'es' } = req.body;
+
+  if (!topic || typeof topic !== 'string' || topic.trim().length < 3) {
+    return res.status(400).json({ error: 'topic is required (min 3 chars)' });
+  }
+
+  try {
+    console.log(`[Jobs] Previewing script: topic="${topic}", duration=${durationMinutes}min, lang=${language}`);
+    const payload = await generateScript({
+      topic: topic.trim(),
+      durationMinutes: Number(durationMinutes),
+      language: language as 'es' | 'en',
+      requestedBy: 'dashboard',
+    });
+
+    // Return the payload only — no job created yet
+    res.status(200).json({
+      payload,
+      generatedByLLM: payload.metadata.generatedByLLM,
+    });
+  } catch (err: any) {
+    console.error('[Jobs] Preview failed:', err.message);
+    res.status(500).json({ error: 'Script generation failed', details: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/jobs/generate  — Generate script AND create job in AWAITING_REVIEW
+// Body: { topic, durationMinutes?, language? }
+// The job will NOT start processing until /approve is called.
 // ─────────────────────────────────────────────────────────────────────────────
 jobRouter.post('/generate', async (req: Request, res: Response) => {
   const { topic, durationMinutes = 10, language = 'es' } = req.body;
@@ -26,13 +59,42 @@ jobRouter.post('/generate', async (req: Request, res: Response) => {
       requestedBy: 'dashboard',
     });
 
-    const job = jobManager.createJob(payload);
-    console.log(`[Jobs] Created job ${job.id} with ${payload.script.scenes.length} scenes`);
+    // Create job in AWAITING_REVIEW — pipeline does NOT start yet
+    const job = jobManager.createJob(payload, JobStatus.AWAITING_REVIEW);
+    console.log(`[Jobs] Created DRAFT job ${job.id} — waiting for user approval`);
     res.status(201).json(job);
   } catch (err: any) {
     console.error('[Jobs] Generate failed:', err.message);
     res.status(500).json({ error: 'Script generation failed', details: err.message });
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/jobs/:id/approve  — User approved the script → start the pipeline
+// Optionally accepts updated payload in body to save user edits before running
+// ─────────────────────────────────────────────────────────────────────────────
+jobRouter.post('/:id/approve', (req: Request, res: Response) => {
+  const job = jobManager.getJob(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+
+  if (job.status !== JobStatus.AWAITING_REVIEW) {
+    return res.status(400).json({ error: `Job is in status "${job.status}", not AWAITING_REVIEW` });
+  }
+
+  // If user sent an updated payload (edited scenes), save it before approving
+  if (req.body?.payload) {
+    try {
+      jobManager.updateJob(job.id, req.body.payload);
+      console.log(`[Jobs] Saved user edits for job ${job.id} before approval`);
+    } catch (e: any) {
+      return res.status(400).json({ error: 'Failed to save edited payload', details: e.message });
+    }
+  }
+
+  // Move to PENDING → triggers pipeline
+  const updated = jobManager.updateStatus(job.id, JobStatus.PENDING);
+  console.log(`[Jobs] Approved job ${job.id} — pipeline starting`);
+  res.json({ message: 'Job approved and pipeline started', job: updated });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,7 +152,7 @@ jobRouter.delete('/:id', (req: Request, res: Response) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PATCH /api/jobs/:id/status  — Manually update status (triggers pipeline)
+// PATCH /api/jobs/:id/status  — Manually update status
 // ─────────────────────────────────────────────────────────────────────────────
 jobRouter.patch('/:id/status', (req: Request, res: Response) => {
   const { status, error } = req.body;
@@ -107,17 +169,16 @@ jobRouter.patch('/:id/status', (req: Request, res: Response) => {
   }
 });
 
-// ─── POST /jobs/:id/re-render — Re-run Remotion only (no AI cost) ─────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /jobs/:id/re-render — Re-run Remotion only (no AI cost)
+// ─────────────────────────────────────────────────────────────────────────────
 jobRouter.post('/:id/re-render', async (req, res) => {
   const job = jobManager.getJob(req.params.id);
   if (!job) return res.status(404).json({ error: 'Job not found' });
 
   console.log(`[Jobs] Re-rendering job ${job.id} (${job.payload.title})`);
-  
-  // Set job to RENDERING so frontend shows live status
   jobManager.updateStatus(job.id, JobStatus.RENDERING);
 
-  // Kick off render in background (don't await)
   (async () => {
     try {
       const { RemotionService } = await import('../services/RemotionService');
@@ -135,4 +196,3 @@ jobRouter.post('/:id/re-render', async (req, res) => {
 
   res.json({ message: 'Re-render started', jobId: job.id, status: 'RENDERING' });
 });
-

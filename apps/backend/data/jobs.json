@@ -264,5 +264,175 @@
     "updatedAt": "2026-03-17T23:11:44.961Z",
     "progress": 100,
     "finalVideoUrl": "http://localhost:3001/outputs/final_c740263e-e020-4421-b4e7-e790857d8533_1773788697830.mp4"
+  },
+  {
+    "id": "0fb23151-93cf-497a-8636-c4856e5b5fd1",
+    "status": "PENDING",
+    "payload": {
+      "projectId": "2361370e-2182-40de-a322-70d7a4fd436c",
+      "title": "La Historia de es un video sobre como afilar un hacha sin destemplarla",
+      "description": "Un recorrido fascinante por es un video sobre como afilar un hacha sin destemplarla, explorando sus orígenes, evolución y futuro.",
+      "targetDuration": 300,
+      "formats": [
+        "16:9"
+      ],
+      "language": "es",
+      "script": {
+        "scenes": [
+          {
+            "sceneId": "s1",
+            "type": "presentation",
+            "narration": "Bienvenidos a este video sobre es un video sobre como afilar un hacha sin destemplarla. Hoy vamos a explorar uno de los temas más fascinantes de nuestra era. Prepárate para un viaje que cambiará la forma en que ves el mundo.",
+            "durationSeconds": 35,
+            "slide": {
+              "headline": "La Historia de\nes un video sobre como afilar un hacha sin destemplarla",
+              "style": "title",
+              "backgroundColor": "#020617",
+              "accentColor": "#6366f1"
+            },
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            }
+          },
+          {
+            "sceneId": "s2",
+            "type": "video",
+            "narration": "Los orígenes de todo empiezan con una idea.",
+            "durationSeconds": 8,
+            "visualPrompt": "Cinematic establishing shot, dramatic lighting, symbolizing the beginning of es un video sobre como afilar un hacha sin destemplarla, ultra-detailed, 8K, professional cinematography",
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            }
+          },
+          {
+            "sceneId": "s3",
+            "type": "presentation",
+            "narration": "Para entender dónde estamos hoy, necesitamos remontarnos al principio. Los primeros pasos fueron modestos, pero sentaron las bases de todo lo que vendría después.",
+            "durationSeconds": 42,
+            "slide": {
+              "headline": "Los Orígenes",
+              "bulletPoints": [
+                "Primera etapa",
+                "Descubrimientos clave",
+                "Los pioneros",
+                "El momento decisivo"
+              ],
+              "style": "bullets",
+              "backgroundColor": "#0f172a",
+              "accentColor": "#3b82f6"
+            },
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            }
+          },
+          {
+            "sceneId": "s4",
+            "type": "presentation",
+            "narration": "Los números hablan por sí solos.",
+            "durationSeconds": 30,
+            "slide": {
+              "headline": "+10 Años de Evolución",
+              "statValue": "10x",
+              "statLabel": "Crecimiento en la última década",
+              "style": "stats",
+              "backgroundColor": "#1e1b4b",
+              "accentColor": "#a855f7"
+            },
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            }
+          },
+          {
+            "sceneId": "s5",
+            "type": "video",
+            "narration": "La transformación fue imparable.",
+            "durationSeconds": 7,
+            "visualPrompt": "Dramatic time-lapse visualization of rapid transformation and growth, professional cinema quality, dark moody aesthetic, neon highlights",
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            }
+          },
+          {
+            "sceneId": "s6",
+            "type": "presentation",
+            "narration": "Hoy, es un video sobre como afilar un hacha sin destemplarla es parte de nuestras vidas de formas que nunca imaginamos. Está en nuestros teléfonos, en nuestras ciudades, en nuestra forma de trabajar y de relacionarnos.",
+            "durationSeconds": 38,
+            "slide": {
+              "headline": "El Presente",
+              "bodyText": "es un video sobre como afilar un hacha sin destemplarla ha transformado completamente la sociedad moderna.",
+              "bulletPoints": [
+                "Impacto económico global",
+                "Cambio en comportamiento humano",
+                "Nuevas industrias emergentes"
+              ],
+              "style": "bullets",
+              "backgroundColor": "#042f2e",
+              "accentColor": "#10b981"
+            },
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            }
+          },
+          {
+            "sceneId": "s7",
+            "type": "presentation",
+            "narration": "¿Y el futuro? Solo estamos viendo el comienzo.",
+            "durationSeconds": 32,
+            "slide": {
+              "headline": "\"El futuro ya está aquí,\nsolo que no está distribuido uniformemente.\"",
+              "bodyText": "— William Gibson",
+              "style": "quote",
+              "backgroundColor": "#1c0533",
+              "accentColor": "#ec4899"
+            },
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            }
+          },
+          {
+            "sceneId": "s8",
+            "type": "video",
+            "narration": "El futuro nos espera. La pregunta es: ¿estás listo?",
+            "durationSeconds": 9,
+            "visualPrompt": "Futuristic utopian cityscape, golden hour lighting, technology and nature coexisting, cinematic aerial shot, incredibly detailed, masterpiece quality",
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            }
+          },
+          {
+            "sceneId": "s9",
+            "type": "presentation",
+            "narration": "Gracias por acompañarnos en este recorrido. Si te gustó este video, suscríbete y activa las notificaciones para no perderte ningún episodio.",
+            "durationSeconds": 28,
+            "slide": {
+              "headline": "¿Te gustó?\nSuscríbete",
+              "style": "transition",
+              "backgroundColor": "#020617",
+              "accentColor": "#6366f1"
+            },
+            "voiceOptions": {
+              "speed": 1,
+              "language": "es"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "createdAt": "2026-03-17T23:45:55.150Z",
+        "requestedBy": "dashboard",
+        "topic": "es un video sobre como afilar un hacha sin destemplarla",
+        "generatedByLLM": true
+      }
+    },
+    "createdAt": "2026-03-17T23:45:55.150Z",
+    "updatedAt": "2026-03-17T23:45:55.150Z"
   }
 ]

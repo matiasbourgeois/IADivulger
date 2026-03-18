@@ -60,7 +60,11 @@ Start-Sleep -Seconds 2
 Start-Service "TTS Server" "apps\tts-server" ".venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port $TTS_PORT" $TTS_PORT
 Start-Sleep -Seconds 2
 
-# 4. Backend (Node.js)
+# 4. AI Worker (FastAPI — video + audio generation)
+Start-Service "AI Worker" "apps\ai-worker" ".venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port $AIWORKER_PORT" $AIWORKER_PORT
+Start-Sleep -Seconds 2
+
+# 5. Backend (Node.js)
 Start-Service "Backend" "." "npx tsx apps\backend\src\server.ts" $BACKEND_PORT
 Start-Sleep -Seconds 2
 

@@ -41,9 +41,9 @@ interface LLMScriptResponse {
 
 function buildPrompt(opts: GenerateOptions): string {
   const { topic, durationMinutes, language } = opts;
-  const targetScenes = Math.round(durationMinutes * 1.3); // ~1.3 scenes per minute
-  const videoScenes = Math.max(2, Math.round(targetScenes * 0.3)); // 30% video
-  const presentationScenes = targetScenes - videoScenes; // 70% presentations
+  const targetScenes = Math.round(durationMinutes * 1.3);
+  const videoScenes = Math.max(2, Math.round(targetScenes * 0.3));
+  const presentationScenes = targetScenes - videoScenes;
   
   const langInstr = language === 'es'
     ? 'Genera TODO el contenido en ESPAÑOL. Las narraciones deben ser naturales y enganchadoras.'
@@ -130,79 +130,127 @@ async function callGemini(prompt: string, apiKey: string): Promise<string> {
   return text;
 }
 
-// ─── Static Fallback (for development without API key) ───────────────────────
+// ─── Static Fallback ─────────────────────────────────────────────────────────
+// Only used when GEMINI_API_KEY is missing or rate-limited.
+// All text uses the user's actual TOPIC so the content is always unique.
 
 function buildFallbackScript(opts: GenerateOptions): LLMScriptResponse {
   const { topic, language } = opts;
-  const isEs = language === 'es';
-  
+  const T = topic; // shorthand
+  const es = language === 'es';
+
   return {
-    title: isEs ? `La Historia de ${topic}` : `The History of ${topic}`,
-    description: isEs
-      ? `Un recorrido fascinante por ${topic}, explorando sus orígenes, evolución y futuro.`
-      : `A fascinating journey through ${topic}, exploring its origins, evolution and future.`,
+    title: es ? `Todo sobre ${T}` : `Everything About ${T}`,
+    description: es
+      ? `Un recorrido profundo y visual por ${T}: sus fundamentos, su impacto actual y su futuro.`
+      : `A deep, visual journey through ${T}: its foundations, current impact, and future potential.`,
     scenes: [
       {
         type: 'presentation',
-        narration: isEs
-          ? `Bienvenidos a este video sobre ${topic}. Hoy vamos a explorar uno de los temas más fascinantes de nuestra era. Prepárate para un viaje que cambiará la forma en que ves el mundo.`
-          : `Welcome to this video about ${topic}. Today we'll explore one of the most fascinating topics of our era.`,
+        narration: es
+          ? `Bienvenidos. Hoy vamos a explorar en profundidad todo lo que necesitás saber sobre ${T}. Un tema que está cambiando el mundo tal como lo conocemos. Quedate hasta el final porque vas a descubrir cosas que no sabías.`
+          : `Welcome. Today we'll explore everything you need to know about ${T}. This topic is reshaping the world as we know it. Stay until the end — you'll discover things you didn't know.`,
         durationSeconds: 35,
-        slide: { headline: isEs ? `La Historia de\n${topic}` : `The History of\n${topic}`, style: 'title', backgroundColor: '#020617', accentColor: '#6366f1' }
+        slide: {
+          headline: es ? `${T}` : `${T}`,
+          bodyText: es ? 'Entendiendo el futuro hoy' : 'Understanding the future today',
+          style: 'title',
+          backgroundColor: '#020617',
+          accentColor: '#6366f1'
+        }
       },
       {
         type: 'video',
-        narration: isEs ? `Los orígenes de todo empiezan con una idea.` : `Every great story begins with a single idea.`,
+        narration: es ? `Todo gran cambio comienza con una visión.` : `Every great change begins with a vision.`,
         durationSeconds: 8,
-        visualPrompt: `Cinematic establishing shot, dramatic lighting, symbolizing the beginning of ${topic}, ultra-detailed, 8K, professional cinematography`
+        visualPrompt: `Cinematic establishing shot representing ${T}, dramatic lighting, ultra-detailed, professional cinematography, 8K quality`
       },
       {
         type: 'presentation',
-        narration: isEs
-          ? `Para entender dónde estamos hoy, necesitamos remontarnos al principio. Los primeros pasos fueron modestos, pero sentaron las bases de todo lo que vendría después.`
-          : `To understand where we are today, we need to go back to the beginning. The first steps were modest, but they laid the foundation for everything that followed.`,
+        narration: es
+          ? `Para comprender ${T} hay que ir a sus raíces. Los conceptos fundamentales que lo sostienen fueron desarrollados durante décadas de investigación y experimentación. Hoy vamos a desglosarlos de forma simple.`
+          : `To truly understand ${T}, we need to examine its roots. The core concepts were developed over decades of research. Let's break them down clearly.`,
         durationSeconds: 42,
-        slide: { headline: isEs ? 'Los Orígenes' : 'The Origins', bulletPoints: isEs ? ['Primera etapa', 'Descubrimientos clave', 'Los pioneros', 'El momento decisivo'] : ['Early stage', 'Key discoveries', 'The pioneers', 'The pivotal moment'], style: 'bullets', backgroundColor: '#0f172a', accentColor: '#3b82f6' }
+        slide: {
+          headline: es ? `Fundamentos de ${T}` : `Foundations of ${T}`,
+          bulletPoints: es
+            ? [`¿Qué es ${T}?`, 'Sus principios clave', 'Por qué importa hoy', 'Quiénes lo impulsan']
+            : [`What is ${T}?`, 'Core principles', 'Why it matters now', 'Who drives it'],
+          style: 'bullets',
+          backgroundColor: '#0f172a',
+          accentColor: '#3b82f6'
+        }
       },
       {
         type: 'presentation',
-        narration: isEs ? `Los números hablan por sí solos.` : `The numbers speak for themselves.`,
+        narration: es
+          ? `Los números no mienten. El impacto de ${T} en la economía global es imposible de ignorar. Estas cifras representan una transformación real.`
+          : `The numbers don't lie. The impact of ${T} on the global economy is impossible to ignore. These figures represent real transformation.`,
         durationSeconds: 30,
-        slide: { headline: isEs ? '+10 Años de Evolución' : '+10 Years of Evolution', statValue: '10x', statLabel: isEs ? 'Crecimiento en la última década' : 'Growth in the last decade', style: 'stats', backgroundColor: '#1e1b4b', accentColor: '#a855f7' }
+        slide: {
+          headline: es ? `El Impacto de ${T}` : `The Impact of ${T}`,
+          statValue: '$1T+',
+          statLabel: es ? `Valor de mercado generado por ${T}` : `Market value generated by ${T}`,
+          style: 'stats',
+          backgroundColor: '#1e1b4b',
+          accentColor: '#a855f7'
+        }
       },
       {
         type: 'video',
-        narration: isEs ? `La transformación fue imparable.` : `The transformation was unstoppable.`,
+        narration: es ? `La transformación ya está ocurriendo.` : `The transformation is already happening.`,
         durationSeconds: 7,
-        visualPrompt: `Dramatic time-lapse visualization of rapid transformation and growth, professional cinema quality, dark moody aesthetic, neon highlights`
+        visualPrompt: `Dramatic visualization of rapid global transformation driven by ${T}, cinematic quality, dark moody aesthetic, neon highlights, professional grade`
       },
       {
         type: 'presentation',
-        narration: isEs
-          ? `Hoy, ${topic} es parte de nuestras vidas de formas que nunca imaginamos. Está en nuestros teléfonos, en nuestras ciudades, en nuestra forma de trabajar y de relacionarnos.`
-          : `Today, ${topic} is part of our lives in ways we never imagined. It's in our phones, our cities, our work.`,
+        narration: es
+          ? `${T} ya está presente en nuestra vida cotidiana de formas que quizás no notamos. Desde cómo compramos hasta cómo trabajamos, su influencia es profunda y creciente.`
+          : `${T} is already present in our daily lives in ways we may not notice. From how we shop to how we work, its influence is deep and growing.`,
         durationSeconds: 38,
-        slide: { headline: isEs ? 'El Presente' : 'The Present', bodyText: isEs ? `${topic} ha transformado completamente la sociedad moderna.` : `${topic} has completely transformed modern society.`, bulletPoints: isEs ? ['Impacto económico global', 'Cambio en comportamiento humano', 'Nuevas industrias emergentes'] : ['Global economic impact', 'Changed human behavior', 'New emerging industries'], style: 'bullets', backgroundColor: '#042f2e', accentColor: '#10b981' }
+        slide: {
+          headline: es ? `${T} en el Mundo Real` : `${T} in the Real World`,
+          bulletPoints: es
+            ? ['Aplicaciones en industria', 'Impacto en el consumidor', 'Nuevos modelos de negocio']
+            : ['Industrial applications', 'Consumer impact', 'New business models'],
+          style: 'bullets',
+          backgroundColor: '#042f2e',
+          accentColor: '#10b981'
+        }
       },
       {
         type: 'presentation',
-        narration: isEs ? `¿Y el futuro? Solo estamos viendo el comienzo.` : `And the future? We're only seeing the beginning.`,
+        narration: es
+          ? `¿Qué nos depara el futuro? Los expertos coinciden: apenas estamos viendo los primeros pasos de lo que ${T} puede lograr. Lo mejor todavía está por venir.`
+          : `What does the future hold? Experts agree: we're only seeing the first steps of what ${T} can achieve. The best is yet to come.`,
         durationSeconds: 32,
-        slide: { headline: isEs ? `"El futuro ya está aquí,\nsolo que no está distribuido uniformemente."` : `"The future is already here,\nit's just not evenly distributed."`, bodyText: '— William Gibson', style: 'quote', backgroundColor: '#1c0533', accentColor: '#ec4899' }
+        slide: {
+          headline: es
+            ? `"El potencial de ${T} apenas está siendo descubierto."`
+            : `"The potential of ${T} is just beginning to be discovered."`,
+          style: 'quote',
+          backgroundColor: '#1c0533',
+          accentColor: '#ec4899'
+        }
       },
       {
         type: 'video',
-        narration: isEs ? `El futuro nos espera. La pregunta es: ¿estás listo?` : `The future is waiting. The question is: are you ready?`,
+        narration: es ? `El futuro ya llegó. ¿Estás listo?` : `The future is here. Are you ready?`,
         durationSeconds: 9,
-        visualPrompt: `Futuristic utopian cityscape, golden hour lighting, technology and nature coexisting, cinematic aerial shot, incredibly detailed, masterpiece quality`
+        visualPrompt: `Futuristic utopian vision of the world transformed by ${T}, golden hour lighting, masterpiece quality, cinematic aerial shot, incredibly detailed`
       },
       {
         type: 'presentation',
-        narration: isEs
-          ? `Gracias por acompañarnos en este recorrido. Si te gustó este video, suscríbete y activa las notificaciones para no perderte ningún episodio.`
-          : `Thank you for joining us on this journey. If you enjoyed this video, subscribe and hit the bell for more content.`,
+        narration: es
+          ? `Eso fue todo sobre ${T}. Esperamos que este video haya cambiado la forma en que lo ves. Suscríbete, compartí con alguien que necesite verlo, y hasta el próximo episodio.`
+          : `That's a wrap on ${T}. We hope this video changed how you see it. Subscribe, share with someone who needs to see this, and see you in the next episode.`,
         durationSeconds: 28,
-        slide: { headline: isEs ? '¿Te gustó?\nSuscríbete' : 'Enjoyed it?\nSubscribe', style: 'transition', backgroundColor: '#020617', accentColor: '#6366f1' }
+        slide: {
+          headline: es ? '¿Te gustó?\nSuscríibete' : 'Enjoyed it?\nSubscribe',
+          style: 'transition',
+          backgroundColor: '#020617',
+          accentColor: '#6366f1'
+        }
       }
     ]
   };
@@ -213,27 +261,27 @@ function buildFallbackScript(opts: GenerateOptions): LLMScriptResponse {
 export async function generateScript(opts: GenerateOptions): Promise<ProjectPayload> {
   const projectId = uuidv4();
   let scriptData: LLMScriptResponse;
+  let generatedByLLM = false;
 
-  // Read dynamically so dotenv has already run
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
   if (GEMINI_API_KEY) {
     try {
       console.log(`[LLMService] Calling Gemini Flash for topic: "${opts.topic}"`);
       const raw = await callGemini(buildPrompt(opts), GEMINI_API_KEY);
-      // Strip markdown fence if present
       const cleaned = raw.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
       scriptData = JSON.parse(cleaned) as LLMScriptResponse;
-      console.log(`[LLMService] Gemini generated ${scriptData.scenes.length} scenes`);
+      generatedByLLM = true;
+      console.log(`[LLMService] ✅ Gemini generated ${scriptData.scenes.length} scenes for "${opts.topic}"`);
     } catch (err: any) {
-      console.warn(`[LLMService] Gemini failed (${err.message}), using fallback static script`);
+      console.warn(`[LLMService] ⚠ Gemini failed: ${err.message}`);
+      console.warn(`[LLMService] Falling back to template script for topic: "${opts.topic}"`);
       scriptData = buildFallbackScript(opts);
     }
   } else {
-    console.log('[LLMService] No GEMINI_API_KEY set — using static fallback script');
+    console.log('[LLMService] No GEMINI_API_KEY — using template script');
     scriptData = buildFallbackScript(opts);
   }
 
-  // Map to our internal Scene type
   const scenes: Scene[] = scriptData.scenes.map((s, idx) => ({
     sceneId: `s${idx + 1}`,
     type: s.type as SceneType,
@@ -259,7 +307,7 @@ export async function generateScript(opts: GenerateOptions): Promise<ProjectPayl
       createdAt: new Date().toISOString(),
       requestedBy: opts.requestedBy || 'dashboard',
       topic: opts.topic,
-      generatedByLLM: !!process.env.GEMINI_API_KEY,
+      generatedByLLM,
     }
   };
 }
