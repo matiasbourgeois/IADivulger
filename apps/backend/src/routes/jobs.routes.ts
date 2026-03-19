@@ -2,9 +2,45 @@ import { Router, Request, Response } from 'express';
 import { JobManager } from '../services/JobManager';
 import { JobStatus } from '../types/job.types';
 import { generateScript } from '../services/LLMService';
+import { gpuQueue } from '../services/GPUQueueManager';
 
 export const jobRouter = Router();
 const jobManager = JobManager.getInstance();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/jobs/queue  — Estado actual de la cola GPU
+// ─────────────────────────────────────────────────────────────────────────────
+jobRouter.get('/queue', (req: Request, res: Response) => {
+  const status = gpuQueue.getStatus();
+  // Enrich with job titles from persistence
+  const enriched = {
+    ...status,
+    activeJob: status.activeJobId ? jobManager.getJob(status.activeJobId) : null,
+    queue: status.queue.map(entry => ({
+      ...entry,
+      job: jobManager.getJob(entry.jobId),
+    })),
+  };
+  res.json(enriched);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /api/jobs/queue/:id  — Remover un job de la cola (solo si está QUEUED)
+// ─────────────────────────────────────────────────────────────────────────────
+jobRouter.delete('/queue/:id', (req: Request, res: Response) => {
+  const job = jobManager.getJob(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  if (job.status !== JobStatus.QUEUED) {
+    return res.status(400).json({ error: `Job is not QUEUED (current: ${job.status})` });
+  }
+  const removed = gpuQueue.cancel(req.params.id);
+  if (removed) {
+    jobManager.updateStatus(req.params.id, JobStatus.AWAITING_REVIEW);
+    res.json({ message: 'Job removed from queue', jobId: req.params.id });
+  } else {
+    res.status(404).json({ error: 'Job not found in queue' });
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/jobs/preview  — Generate a script preview WITHOUT creating a job
@@ -81,10 +117,12 @@ jobRouter.post('/:id/approve', (req: Request, res: Response) => {
     return res.status(400).json({ error: `Job is in status "${job.status}", not AWAITING_REVIEW` });
   }
 
-  // If user sent an updated payload (edited scenes), save it before approving
-  if (req.body?.payload) {
+  // If user sent updated data, merge it before approving
+  // Dashboard sends { script: { scenes: [...] } }; direct API may send { payload: {...} }
+  const editPayload = req.body?.payload || (req.body?.script ? { script: req.body.script } : null);
+  if (editPayload) {
     try {
-      jobManager.updateJob(job.id, req.body.payload);
+      jobManager.updateJob(job.id, editPayload);
       console.log(`[Jobs] Saved user edits for job ${job.id} before approval`);
     } catch (e: any) {
       return res.status(400).json({ error: 'Failed to save edited payload', details: e.message });
@@ -181,7 +219,7 @@ jobRouter.post('/:id/re-render', async (req, res) => {
 
   (async () => {
     try {
-      const { RemotionService } = await import('../services/RemotionService');
+      const { RemotionService } = await import('../services/RemotionService.js');
       const finalVideoUrl = await RemotionService.renderVideo(job.payload);
       const currentJob = jobManager.getJob(job.id)!;
       currentJob.finalVideoUrl = finalVideoUrl;

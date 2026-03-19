@@ -21,7 +21,7 @@ from clients.comfyui_client import (
     ComfyUIOutOfMemoryError,
     ComfyUITimeoutError,
 )
-from clients.qwen_tts_client import QwenTTSClient, QwenTTSError, QwenTTSOfflineError
+from clients.kokoro_tts_client import KokoroTTSClient, KokoroTTSError, KokoroTTSOfflineError
 from config import get_settings
 from progress_manager import progress_manager
 from schemas import (
@@ -30,6 +30,8 @@ from schemas import (
     VideoGenerateRequest,
     VideoGenerateResponse,
     VideoQueueResponse,
+    ImageGenerateRequest,
+    ImageGenerateResponse,
     HealthResponse,
     ProgressResponse,
 )
@@ -68,14 +70,14 @@ async def get_active_progress():
     summary="Check connectivity to local AI services",
 )
 async def health_check():
-    """Ping ComfyUI and Qwen TTS to report their live status."""
+    """Ping ComfyUI and Kokoro TTS to report their live status."""
     comfyui_online = False
     tts_online = False
 
     async with ComfyUIClient() as comfy:
         comfyui_online = await comfy.health_check()
 
-    async with QwenTTSClient() as tts:
+    async with KokoroTTSClient() as tts:
         tts_online = await tts.health_check()
 
     overall = "ok" if (comfyui_online and tts_online) else "degraded"
@@ -90,24 +92,24 @@ import asyncio
     "/audio",
     response_model=AudioGenerateResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Generate narration audio for a scene via Qwen3-TTS",
+    summary="Generate narration audio for a scene via Kokoro TTS",
 )
 async def generate_audio(req: AudioGenerateRequest):
     """
-    Synthesizes speech for the given text using the local Qwen3-TTS server.
+    Synthesizes speech for the given text using the local Kokoro TTS server.
+    Returns audio_path + duration_ms real medida desde el servidor.
     """
     logger.info(f"[Route /audio] scene_id={req.scene_id} | chars={len(req.text)}")
 
     if settings.use_mock:
         logger.warning(f"[MOCK] Simulating audio generation for {req.scene_id}")
         await asyncio.sleep(2)
-        # Using a public valid mp3 for testing
         mock_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-        return AudioGenerateResponse(scene_id=req.scene_id, audio_path=mock_url)
+        return AudioGenerateResponse(scene_id=req.scene_id, audio_path=mock_url, duration_ms=5000)
 
     try:
-        async with QwenTTSClient() as tts:
-            audio_path = await tts.generate(
+        async with KokoroTTSClient() as tts:
+            result = await tts.generate(
                 text=req.text,
                 speed=req.voice_options.speed,
                 language=req.voice_options.language,
@@ -115,25 +117,107 @@ async def generate_audio(req: AudioGenerateRequest):
                 output_dir=settings.assets_audio_dir,
                 filename_prefix=f"{req.output_filename_prefix}_{req.scene_id}",
             )
-    except QwenTTSOfflineError as exc:
+    except KokoroTTSOfflineError as exc:
         logger.warning(f"[Route /audio] TTS server offline: {exc}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"error": "TTS_OFFLINE", "message": str(exc)},
         )
-    except QwenTTSError as exc:
+    except KokoroTTSError as exc:
         logger.error(f"[Route /audio] TTS generation failed: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": "TTS_FAILED", "message": str(exc)},
         )
 
-    # Convert to relative path from assets_base_dir
-    rel_path = Path(audio_path).relative_to(settings.assets_base_dir)
-    return AudioGenerateResponse(scene_id=req.scene_id, audio_path=rel_path.as_posix())
+    # Convert to relative path from assets_base_dir + include real duration
+    rel_path = Path(result.path).relative_to(settings.assets_base_dir)
+    return AudioGenerateResponse(
+        scene_id=req.scene_id,
+        audio_path=rel_path.as_posix(),
+        duration_ms=result.duration_ms,
+    )
 
 
-# ─── Video / Image Generation ────────────────────────────────────────────────
+# ─── FLUX Image Generation ───────────────────────────────────────────────────
+
+@router.post(
+    "/image",
+    response_model=ImageGenerateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Generate a photorealistic keyframe image using FLUX 2 Klein via ComfyUI",
+)
+async def generate_image(req: ImageGenerateRequest):
+    """
+    Sends a FLUX 2 Klein workflow to ComfyUI, waits for the image,
+    saves it to assets/images/, and returns the path.
+    Used as input for Wan 2.2 I2V (image-to-video).
+    """
+    import os
+    logger.info(f"[Route /image] scene_id={req.scene_id} | prompt='{req.visual_prompt[:80]}…'")
+
+    if settings.use_mock:
+        logger.warning(f"[MOCK] Simulating image generation for {req.scene_id}")
+        await asyncio.sleep(2)
+        return ImageGenerateResponse(
+            scene_id=req.scene_id,
+            image_path="mock/keyframe.png",
+            image_filename="keyframe_mock.png",
+        )
+
+    # Ensure output dir exists
+    os.makedirs(settings.assets_image_dir, exist_ok=True)
+
+    try:
+        async with ComfyUIClient() as comfy:
+            asset_path, prompt_id = await comfy.queue_and_wait(
+                workflow=req.workflow,
+                output_dir=settings.assets_image_dir,
+                filename_prefix=f"{req.output_filename_prefix}_{req.scene_id}",
+            )
+    except ComfyUIOfflineError as exc:
+        logger.warning(f"[Route /image] ComfyUI offline: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error": "COMFYUI_OFFLINE", "message": str(exc)},
+        )
+    except (ComfyUIOutOfMemoryError, ComfyUITimeoutError, ComfyUIError) as exc:
+        logger.error(f"[Route /image] ComfyUI error: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "COMFYUI_ERROR", "message": str(exc)},
+        )
+    except Exception as exc:
+        logger.exception(f"[Route /image] Unhandled error: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "INTERNAL_SERVER_ERROR", "message": str(exc)},
+        )
+
+    # Get the filename for ComfyUI's LoadImage node (I2V needs it)
+    image_filename = Path(asset_path).name
+    rel_path = Path(asset_path).relative_to(settings.assets_base_dir)
+
+    # ── CRITICAL: Copy image to ComfyUI's input/ dir for LoadImage node ──
+    # LoadImage only reads from comfyui/input/, not from our assets dir.
+    comfyui_input = Path(settings.comfyui_input_dir).resolve()
+    os.makedirs(str(comfyui_input), exist_ok=True)
+    dest = comfyui_input / image_filename
+    import shutil
+    shutil.copy2(str(asset_path), str(dest))
+    logger.info(f"[Route /image] Copied FLUX image to ComfyUI input: {dest}")
+
+    logger.success(f"[Route /image] FLUX image ready: {image_filename} (assets + ComfyUI input)")
+
+    return ImageGenerateResponse(
+        scene_id=req.scene_id,
+        prompt_id=prompt_id,
+        image_path=rel_path.as_posix(),
+        image_filename=image_filename,
+    )
+
+
+# ─── Video Generation ────────────────────────────────────────────────────────
 
 # In-memory store for active video generation tasks
 _active_video_tasks: dict[str, asyncio.Task] = {}

@@ -1,81 +1,240 @@
+"""
+IADivulger TTS Server — Kokoro TTS
+====================================
+Reemplaza el servidor Qwen3-TTS por Kokoro TTS con voz em_alex (español masculino latinoam.)
+
+Características:
+  - Voz consistente: siempre em_alex (español masculino natural)
+  - Retorna la duración real del audio en el header X-Audio-Duration-Seconds
+  - Sin silencio inicial: trim automático de silence al inicio
+  - API compatible con el cliente anterior (mismo contrato POST /generate)
+  - Endpoint /voices para listar voces disponibles
+
+Futuro: este servidor soportará F5-TTS para voice cloning con audio de referencia.
+
+Uso:
+  pip install kokoro soundfile numpy
+  python main.py  (puerto 9000)
+"""
+
 import io
 import time
-import torch
-import soundfile as sf
+import wave
+import struct
 import os
-import numpy as np
-import sys
 import asyncio
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from qwen_tts import Qwen3TTSModel
 from pathlib import Path
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="IADivulger Local Qwen3-TTS Server")
+import numpy as np
+import soundfile as sf
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse, JSONResponse
+from pydantic import BaseModel
+from loguru import logger
 
-# Global variables
-device = "cuda" if torch.cuda.is_available() else "cpu"
-tts_model = None
-model_path = "c:/Users/BOURGEOIS/Desktop/IADivulger/apps/tts-server/model"
+# ─── Kokoro TTS Global ────────────────────────────────────────────────────────
+tts_pipeline = None
+VOICE = os.getenv("KOKORO_VOICE", "em_alex")      # voz en español masculino
+SAMPLE_RATE = 24000                                  # Kokoro usa 24kHz por defecto
+LANG_CODE = "e"                                      # 'e' = español en Kokoro
 
-@app.on_event("startup")
-async def load_model():
-    global tts_model
-    print(f"Loading Qwen3-TTS (1.7B CustomVoice) to {device} from {model_path}...")
+# ─── Lifespan ─────────────────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global tts_pipeline
+    logger.info("🔊 Cargando Kokoro TTS...")
     try:
-        # Qwen3TTSModel.from_pretrained handles AutoConfig/AutoModel registration internally
-        tts_model = Qwen3TTSModel.from_pretrained(
-            model_path, 
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-            device_map=device
-        )
-        print("Qwen3-TTS loaded successfully!")
+        from kokoro import KPipeline
+        tts_pipeline = KPipeline(lang_code=LANG_CODE)
+        logger.success(f"✅ Kokoro TTS listo — voz: {VOICE} | lang: {LANG_CODE}")
+    except ImportError:
+        logger.error("❌ Kokoro no instalado. Ejecutá: pip install kokoro soundfile")
+        tts_pipeline = None
     except Exception as e:
-        print(f"Failed to load Qwen3-TTS: {e}")
+        logger.error(f"❌ Error cargando Kokoro: {e}")
+        tts_pipeline = None
+    yield
+    logger.info("Kokoro TTS server apagándose.")
+
+
+app = FastAPI(
+    title="IADivulger Kokoro TTS Server",
+    description="Text-to-Speech con Kokoro — voz em_alex español masculino",
+    version="2.0.0",
+    lifespan=lifespan,
+)
+
+
+# ─── Health Check ─────────────────────────────────────────────────────────────
+
+@app.get("/health")
+async def health():
+    """Health check for preflight validation."""
+    return {
+        "status": "ok" if tts_pipeline is not None else "loading",
+        "model": "kokoro",
+        "voice": VOICE,
+        "ready": tts_pipeline is not None,
+    }
+
+
+# ─── Schemas ──────────────────────────────────────────────────────────────────
 
 class GenerateRequest(BaseModel):
     text: str
-    voice_description: str = "A professional, clear male voice."
+    voice_description: str = "Professional clear male voice"
+    speed: float = 1.0
+    language: str = "es"
+    voice_id: str | None = None   # override de voz (ej: "em_santa")
+
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def get_audio_duration_seconds(audio_array: np.ndarray, sample_rate: int) -> float:
+    """Calcula la duración real del audio en segundos."""
+    return len(audio_array) / sample_rate
+
+
+def trim_leading_silence(audio: np.ndarray, threshold: float = 0.01, sr: int = 24000) -> np.ndarray:
+    """Elimina el silencio al inicio del audio."""
+    if len(audio) == 0:
+        return audio
+    # Buscar primer sample que supere el umbral
+    abs_audio = np.abs(audio)
+    nonsilent = np.where(abs_audio > threshold)[0]
+    if len(nonsilent) == 0:
+        return audio
+    start = max(0, nonsilent[0] - int(sr * 0.05))  # 50ms de margen
+    return audio[start:]
+
+
+def audio_to_wav_bytes(audio: np.ndarray, sample_rate: int) -> bytes:
+    """Convierte array de numpy a bytes WAV en memoria."""
+    buffer = io.BytesIO()
+    sf.write(buffer, audio, sample_rate, format="WAV", subtype="PCM_16")
+    buffer.seek(0)
+    return buffer.read()
+
+
+# ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @app.post("/generate")
 async def generate(req: GenerateRequest):
-    if tts_model is None:
-        raise HTTPException(status_code=503, detail="Model not initialized.")
-
-    try:
-        start_time = time.time()
-        
-        # Run the blocking model inference in a threadpool to keep the event loop responsive
-        loop = asyncio.get_event_loop()
-        wavs, sampling_rate = await loop.run_in_executor(
-            None, 
-            lambda: tts_model.generate_custom_voice(req.text, "ryan", "spanish")
+    """
+    Genera audio WAV para el texto dado.
+    Retorna el WAV como streaming response.
+    Header X-Audio-Duration-Seconds: duración real del audio generado.
+    """
+    if tts_pipeline is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Kokoro TTS no está cargado. Verificá la instalación."
         )
-        
-        audio_arr = wavs[0]
-        gen_time = time.time() - start_time
-        print(f"Generated {len(audio_arr)/sampling_rate:.2f}s of audio in {gen_time:.2f}s")
 
-        buffer = io.BytesIO()
-        sf.write(buffer, audio_arr, sampling_rate, format='WAV')
-        buffer.seek(0)
+    if not req.text or not req.text.strip():
+        raise HTTPException(status_code=400, detail="El texto no puede estar vacío.")
 
-        return StreamingResponse(buffer, media_type="audio/wav")
+    voice = req.voice_id or VOICE
+    text = req.text.strip()
 
+    logger.info(f"[Kokoro] Generando | voz={voice} | chars={len(text)} | speed={req.speed}")
+
+    start_time = time.time()
+    try:
+        loop = asyncio.get_event_loop()
+        audio_chunks = await loop.run_in_executor(
+            None,
+            lambda: list(tts_pipeline(text, voice=voice, speed=req.speed))
+        )
     except Exception as e:
-        print(f"Error during generation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"[Kokoro] Error en síntesis: {e}")
+        raise HTTPException(status_code=500, detail=f"Error en síntesis TTS: {e}")
+
+    # KPipeline 0.9.4 yields Result objects with .audio attribute (torch.Tensor)
+    # (older API returned (graphemes, phonemes, audio) tuples — keep fallback)
+    all_audio = []
+    for chunk in audio_chunks:
+        if hasattr(chunk, 'audio'):
+            # New API: Result object
+            audio_data = chunk.audio
+        elif isinstance(chunk, tuple) and len(chunk) >= 3:
+            # Old tuple API fallback
+            audio_data = chunk[2]
+        else:
+            audio_data = chunk
+
+        if audio_data is None:
+            continue
+        try:
+            if hasattr(audio_data, 'detach'):
+                arr = audio_data.detach().cpu().numpy().flatten().astype(np.float32)
+            else:
+                arr = np.array(audio_data, dtype=np.float32).flatten()
+            if len(arr) > 0:
+                all_audio.append(arr)
+        except Exception as chunk_err:
+            logger.warning(f"[Kokoro] Chunk skip: {chunk_err}")
+            continue
+
+    if not all_audio:
+        raise HTTPException(status_code=500, detail="Kokoro generó audio vacío.")
+
+    full_audio = np.concatenate(all_audio)
+
+    # Trim silencio inicial
+    full_audio = trim_leading_silence(full_audio, sr=SAMPLE_RATE)
+
+    # Calcular duración real
+    duration_s = get_audio_duration_seconds(full_audio, SAMPLE_RATE)
+    gen_time = time.time() - start_time
+
+    logger.success(
+        f"[Kokoro] ✓ {duration_s:.2f}s de audio generado en {gen_time:.2f}s | voz={voice}"
+    )
+
+    # Convertir a WAV bytes
+    wav_bytes = audio_to_wav_bytes(full_audio, SAMPLE_RATE)
+
+    return StreamingResponse(
+        io.BytesIO(wav_bytes),
+        media_type="audio/wav",
+        headers={
+            "X-Audio-Duration-Seconds": f"{duration_s:.3f}",
+            "X-Voice-Used": voice,
+            "X-Generation-Time-Seconds": f"{gen_time:.3f}",
+        }
+    )
+
+
+@app.get("/voices")
+async def list_voices():
+    """Lista las voces disponibles en español."""
+    return {
+        "voices": [
+            {"id": "em_alex", "lang": "es", "gender": "male", "accent": "latinoam", "default": True},
+            {"id": "em_santa", "lang": "es", "gender": "male", "accent": "latinoam", "default": False},
+        ],
+        "current_default": VOICE,
+        "note": "Futuro: voice cloning con F5-TTS usando audio de referencia propio."
+    }
+
 
 @app.get("/health")
 async def health():
     return {
-        "status": "ok", 
-        "device": device, 
-        "model": "Qwen3-TTS-1.7B-CustomVoice", 
-        "loaded": tts_model is not None
+        "status": "ok",
+        "service": "kokoro-tts",
+        "model": "Kokoro",
+        "voice": VOICE,
+        "lang_code": LANG_CODE,
+        "loaded": tts_pipeline is not None,
+        "sample_rate": SAMPLE_RATE,
     }
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=9000)
+    port = int(os.getenv("TTS_PORT", "9000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

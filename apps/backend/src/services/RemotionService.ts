@@ -19,6 +19,8 @@ export class RemotionService {
         audioUrl: s.audioUrl || '',
         durationInSeconds: s.durationSeconds,
         slide: s.slide,
+        imageEffect: s.imageEffect,     // Camera effect for image scenes
+        sourceUrls: s.sourceUrls,       // Tavily web sources → badge overlay
       }))
     };
   }

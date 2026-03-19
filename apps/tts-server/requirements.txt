@@ -1,0 +1,7 @@
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+kokoro>=0.9.4
+soundfile>=0.12.1
+numpy>=1.26.0
+loguru>=0.7.2
+aiofiles>=23.2.1

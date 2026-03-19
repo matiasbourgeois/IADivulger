@@ -1,0 +1,175 @@
+{
+  "_comment": "Wan 2.2 I2V - Image to Video - LightX2V 4-step LoRA pipeline. Extracted from the official ComfyUI blueprint 'Image to Video (Wan 2.2).json'. Uses native ComfyUI nodes (no WanVideoWrapper). The prompt_node is node '9' (CLIPTextEncode positive). The image_node is 'LoadImage' node '11'.",
+  "_prompt_node": "9",
+  "_image_node": "11",
+  "_frame_length": 33,
+  "_recommended_fps": 16,
+
+  "1": {
+    "_meta": { "title": "CLIPLoader (UMT5 text encoder)" },
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    }
+  },
+  "2": {
+    "_meta": { "title": "VAELoader (Wan 2.1 VAE)" },
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    }
+  },
+  "3": {
+    "_meta": { "title": "UNETLoader HIGH noise model" },
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "4": {
+    "_meta": { "title": "UNETLoader LOW noise model" },
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "5": {
+    "_meta": { "title": "LoraLoaderModelOnly HIGH noise" },
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": ["3", 0],
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+      "strength_model": 1.0
+    }
+  },
+  "6": {
+    "_meta": { "title": "LoraLoaderModelOnly LOW noise" },
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": ["4", 0],
+      "lora_name": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+      "strength_model": 1.0
+    }
+  },
+  "7": {
+    "_meta": { "title": "ModelSamplingSD3 HIGH noise (shift=5)" },
+    "class_type": "ModelSamplingSD3",
+    "inputs": {
+      "model": ["5", 0],
+      "shift": 5.0
+    }
+  },
+  "8": {
+    "_meta": { "title": "ModelSamplingSD3 LOW noise (shift=5)" },
+    "class_type": "ModelSamplingSD3",
+    "inputs": {
+      "model": ["6", 0],
+      "shift": 5.0
+    }
+  },
+  "9": {
+    "_meta": { "title": "CLIPTextEncode POSITIVE — inject visual_prompt here" },
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["1", 0],
+      "text": "[PROMPT]"
+    }
+  },
+  "10": {
+    "_meta": { "title": "CLIPTextEncode NEGATIVE" },
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["1", 0],
+      "text": "blurry, low quality, static, distorted, watermark, text, worst quality, JPEG artifacts"
+    }
+  },
+  "11": {
+    "_meta": { "title": "LoadImage — input frame for I2V" },
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "example.png"
+    }
+  },
+  "12": {
+    "_meta": { "title": "WanImageToVideo — encodes image + conditioning into latent" },
+    "class_type": "WanImageToVideo",
+    "inputs": {
+      "positive": ["9", 0],
+      "negative": ["10", 0],
+      "vae": ["2", 0],
+      "start_image": ["11", 0],
+      "width": 832,
+      "height": 480,
+      "length": 33,
+      "batch_size": 1
+    }
+  },
+  "13": {
+    "_meta": { "title": "KSamplerAdvanced HIGH (steps 0→2, add_noise=enable)" },
+    "class_type": "KSamplerAdvanced",
+    "inputs": {
+      "model": ["7", 0],
+      "positive": ["12", 0],
+      "negative": ["12", 1],
+      "latent_image": ["12", 2],
+      "add_noise": "enable",
+      "noise_seed": 42,
+      "control_after_generate": "fixed",
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 2,
+      "return_with_leftover_noise": "enable"
+    }
+  },
+  "14": {
+    "_meta": { "title": "KSamplerAdvanced LOW (steps 2→4, add_noise=disable)" },
+    "class_type": "KSamplerAdvanced",
+    "inputs": {
+      "model": ["8", 0],
+      "positive": ["12", 0],
+      "negative": ["12", 1],
+      "latent_image": ["13", 0],
+      "add_noise": "disable",
+      "noise_seed": 42,
+      "control_after_generate": "fixed",
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 2,
+      "end_at_step": 4,
+      "return_with_leftover_noise": "disable"
+    }
+  },
+  "15": {
+    "_meta": { "title": "VAEDecode — latent to frames" },
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["14", 0],
+      "vae": ["2", 0]
+    }
+  },
+  "16": {
+    "_meta": { "title": "VHS_VideoCombine — save as MP4" },
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": ["15", 0],
+      "frame_rate": 16,
+      "loop_count": 0,
+      "filename_prefix": "IADivulger_I2V",
+      "format": "video/h264-mp4",
+      "pingpong": false,
+      "save_output": true,
+      "pix_fmt": "yuv420p",
+      "crf": 15,
+      "save_metadata": true
+    }
+  }
+}

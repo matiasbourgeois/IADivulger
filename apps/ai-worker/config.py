@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     comfyui_ws_url: str = "ws://127.0.0.1:8189"
     comfyui_poll_interval_s: float = 2.0
     comfyui_timeout_s: float = 3600.0
+    comfyui_input_dir: str = "../comfyui/input"  # Where LoadImage looks for files
 
     # Qwen TTS
     qwen_tts_url: str = "http://127.0.0.1:9000"

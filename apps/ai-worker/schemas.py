@@ -25,7 +25,8 @@ class AudioGenerateRequest(BaseModel):
 class AudioGenerateResponse(BaseModel):
     scene_id: str
     audio_path: str
-    provider: str = "QwenTTS-Local"
+    duration_ms: int = Field(default=0, description="Duración real del audio generado en ms")
+    provider: str = "Kokoro-Local"
 
 
 # ─── Video ───────────────────────────────────────────────────────────────────
@@ -55,6 +56,26 @@ class VideoQueueResponse(BaseModel):
     scene_id: str
     prompt_id: str
     provider: str = "ComfyUI-Local"
+
+
+# ─── Image ───────────────────────────────────────────────────────────────────
+
+class ImageGenerateRequest(BaseModel):
+    scene_id: str = Field(..., description="Unique ID of the scene")
+    visual_prompt: str = Field(..., min_length=1, description="Prompt for FLUX image generation")
+    workflow: dict = Field(
+        ...,
+        description="Full ComfyUI API-format workflow JSON for FLUX image generation.",
+    )
+    output_filename_prefix: str = Field(default="keyframe")
+
+
+class ImageGenerateResponse(BaseModel):
+    scene_id: str
+    prompt_id: str | None = None
+    image_path: str
+    image_filename: str
+    provider: str = "FLUX2-Klein-Local"
 
 
 # ─── Health ──────────────────────────────────────────────────────────────────

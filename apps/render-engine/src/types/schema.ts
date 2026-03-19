@@ -1,5 +1,5 @@
-export type SceneType = 'presentation' | 'video';
-export type SlideStyle = 'title' | 'bullets' | 'quote' | 'stats' | 'transition' | 'chapter';
+export type SceneType = 'presentation' | 'video' | 'image';
+export type SlideStyle = 'title' | 'bullets' | 'quote' | 'stats' | 'transition' | 'chapter' | 'bar_chart';
 
 export interface SlideData {
   headline: string;
@@ -10,6 +10,11 @@ export interface SlideData {
   style: SlideStyle;
   backgroundColor?: string;
   accentColor?: string;
+  chartData?: {
+    labels: string[];
+    values: number[];
+    unit?: string;
+  };
 }
 
 export interface VoiceOptions {
@@ -21,10 +26,12 @@ export interface RenderScene {
   sceneId: string;
   type: SceneType;
   narrationText: string;
-  assetUrl?: string;      // For type='video' scenes
+  assetUrl?: string;      // For type='video' and 'image' scenes
   audioUrl?: string;      // TTS audio URL
   durationInSeconds: number;
   slide?: SlideData;      // For type='presentation' scenes
+  imageEffect?: 'zoom_in' | 'zoom_out' | 'pan_left' | 'pan_right' | 'ken_burns';
+  sourceUrls?: string[];  // Tavily web sources
 }
 
 export interface RenderPayload {

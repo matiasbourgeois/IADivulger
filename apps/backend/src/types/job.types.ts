@@ -2,6 +2,7 @@ export enum JobStatus {
   PENDING = 'PENDING',
   GENERATING_SCRIPT = 'GENERATING_SCRIPT', // LLM is writing the script
   AWAITING_REVIEW = 'AWAITING_REVIEW',     // Script ready, user reviewing
+  QUEUED = 'QUEUED',                       // Approved but GPU busy — waiting in queue
   GENERATING_ASSETS = 'GENERATING_ASSETS', // TTS + Wan 2.2 running
   RENDERING = 'RENDERING',                 // Remotion compositing
   COMPLETED = 'COMPLETED',
@@ -10,9 +11,9 @@ export enum JobStatus {
 
 // ─── Scene types ─────────────────────────────────────────────────────────────
 
-export type SceneType = 'presentation' | 'video';
+export type SceneType = 'presentation' | 'video' | 'image';
 
-export type SlideStyle = 'title' | 'bullets' | 'quote' | 'stats' | 'transition' | 'chapter';
+export type SlideStyle = 'title' | 'bullets' | 'quote' | 'stats' | 'transition' | 'chapter' | 'bar_chart';
 
 export interface SlideData {
   headline: string;
@@ -23,6 +24,11 @@ export interface SlideData {
   style: SlideStyle;
   backgroundColor?: string; // e.g. "#0f172a"
   accentColor?: string;
+  chartData?: {            // For bar_chart slides
+    labels: string[];
+    values: number[];
+    unit?: string;
+  };
 }
 
 export interface VoiceOptions {
@@ -42,12 +48,17 @@ export interface Scene {
   
   // For type='presentation' only
   slide?: SlideData;
+
+  // For type='image' — FLUX still image with camera effect
+  imagePrompt?: string;
+  imageEffect?: 'zoom_in' | 'zoom_out' | 'pan_left' | 'pan_right' | 'ken_burns';
   
   voiceOptions: VoiceOptions;
   audioPath?: string;        // Real local path from AI Worker
   audioUrl?: string;         // Full URL for frontend
-  assetPath?: string;        // Local path (video type only)
-  assetUrl?: string;         // Full URL (video type only)
+  assetPath?: string;        // Local path (video/image type)
+  assetUrl?: string;         // Full URL (video/image type)
+  sourceUrls?: string[];     // Web sources used in narration (from Tavily)
 }
 
 export interface ProjectScript {
@@ -59,6 +70,7 @@ export interface Metadata {
   requestedBy: string;
   topic?: string;
   generatedByLLM?: boolean;
+  provider?: string; // 'claude' | 'groq' | 'gemini' | 'template'
 }
 
 export interface ProjectPayload {

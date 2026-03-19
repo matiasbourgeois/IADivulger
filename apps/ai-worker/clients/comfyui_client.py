@@ -134,25 +134,54 @@ class ComfyUIClient:
             )
 
     async def _queue_prompt(self, workflow: dict) -> str:
-        """POST the workflow and return the prompt_id."""
-        logger.info(f"[ComfyUI] Sending prompt to {self._base_url}/prompt ...")
-        payload = {"prompt": workflow, "client_id": self._client_id}
-        try:
-            resp = await self._http.post("/prompt", json=payload)
-            logger.info(f"[ComfyUI] POST /prompt status: {resp.status_code}")
-            resp.raise_for_status()
-        except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
-            logger.error(f"[ComfyUI] Connection error: {exc}")
-            raise ComfyUIOfflineError(f"Lost connection to ComfyUI while queuing prompt: {exc}")
-        except httpx.TimeoutException as exc:
-            logger.error(f"[ComfyUI] Timeout error: {exc}")
-            raise ComfyUITimeoutError(f"ComfyUI request timed out during queuing: {exc}")
-        except httpx.HTTPStatusError as exc:
-            logger.error(f"[ComfyUI] HTTP error: {exc.response.status_code} - {exc.response.text}")
-            raise ComfyUIError(f"ComfyUI returned HTTP {exc.response.status_code}: {exc.response.text}")
+        """POST the workflow and return the prompt_id. Retries on HTTP 500."""
+        max_attempts = 3
 
-        data = resp.json()
-        return data["prompt_id"]
+        # ── Sanitize workflow: strip top-level keys starting with _ ──────
+        # ComfyUI's node_replace_manager iterates prompt.values() and expects
+        # each value to be a dict with "class_type". Metadata keys like
+        # _comment (str), _frame_length (int), _recommended_fps (int) cause
+        # TypeError: argument of type 'int' is not iterable.
+        clean_workflow = {
+            k: v for k, v in workflow.items() if not k.startswith("_")
+        }
+        stripped = set(workflow.keys()) - set(clean_workflow.keys())
+        if stripped:
+            logger.info(f"[ComfyUI] Stripped {len(stripped)} metadata keys from workflow: {sorted(stripped)}")
+
+        for attempt in range(1, max_attempts + 1):
+            logger.info(f"[ComfyUI] Sending prompt to {self._base_url}/prompt (attempt {attempt}/{max_attempts})...")
+            payload = {"prompt": clean_workflow, "client_id": self._client_id}
+            try:
+                resp = await self._http.post("/prompt", json=payload)
+                logger.info(f"[ComfyUI] POST /prompt status: {resp.status_code}")
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return data["prompt_id"]
+                
+                # Log full response body for debugging
+                body_text = resp.text[:500] if resp.text else "(empty)"
+                
+                if resp.status_code == 500 and attempt < max_attempts:
+                    logger.warning(f"[ComfyUI] HTTP 500 (attempt {attempt}), retrying in 3s... Body: {body_text}")
+                    await asyncio.sleep(3)
+                    continue
+                
+                resp.raise_for_status()
+                
+            except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+                logger.error(f"[ComfyUI] Connection error: {exc}")
+                raise ComfyUIOfflineError(f"Lost connection to ComfyUI while queuing prompt: {exc}")
+            except httpx.TimeoutException as exc:
+                logger.error(f"[ComfyUI] Timeout error: {exc}")
+                raise ComfyUITimeoutError(f"ComfyUI request timed out during queuing: {exc}")
+            except httpx.HTTPStatusError as exc:
+                body = exc.response.text[:500] if exc.response.text else "(empty)"
+                logger.error(f"[ComfyUI] HTTP error: {exc.response.status_code} - {body}")
+                raise ComfyUIError(f"ComfyUI returned HTTP {exc.response.status_code}: {body}")
+        
+        raise ComfyUIError(f"ComfyUI returned HTTP 500 after {max_attempts} attempts")
 
     async def _wait_for_completion(self, prompt_id: str) -> dict:
         """

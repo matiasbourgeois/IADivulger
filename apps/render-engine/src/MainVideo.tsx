@@ -3,6 +3,7 @@ import React from 'react';
 import { Series } from 'remotion';
 import { PresentationSlide } from './components/PresentationSlide';
 import { VideoScene } from './components/VideoScene';
+import { ImageScene } from './components/ImageScene';
 
 export const MainVideo: React.FC<{ payload: any; format: any }> = ({ payload, format }) => {
   const fps = 30;
@@ -24,6 +25,8 @@ export const MainVideo: React.FC<{ payload: any; format: any }> = ({ payload, fo
           <Series.Sequence key={`${scene.sceneId || index}`} durationInFrames={dur}>
             {scene.type === 'presentation'
               ? <PresentationSlide scene={scene} />
+              : scene.type === 'image'
+              ? <ImageScene scene={scene} />
               : <VideoScene scene={scene} format={format || '16:9'} />
             }
           </Series.Sequence>

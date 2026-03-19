@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Job, JobStatus, ProjectPayload } from '../types/job.types';
 import { AiWorkerClient } from './AiWorkerClient';
 import { RemotionService } from './RemotionService';
+import { gpuQueue } from './GPUQueueManager';
 import fs from 'fs';
 import path from 'path';
 
@@ -43,7 +44,7 @@ export class JobManager {
         job.createdAt = new Date(job.createdAt);
         job.updatedAt = new Date(job.updatedAt);
         // Reset zombie in-progress jobs — put them back to AWAITING_REVIEW so user can re-approve
-        if (job.status === JobStatus.GENERATING_ASSETS || job.status === JobStatus.RENDERING) {
+        if (job.status === JobStatus.GENERATING_ASSETS || job.status === JobStatus.RENDERING || job.status === JobStatus.QUEUED) {
           console.log(`[JobManager] Resetting zombie job ${job.id} from ${job.status} → AWAITING_REVIEW`);
           job.status = JobStatus.AWAITING_REVIEW;
           job.progress = 0;
@@ -145,16 +146,62 @@ export class JobManager {
     this.saveJobs();
     console.log(`[JobManager] Job ${id} status → ${status}`);
 
-    // Start the pipeline when job is approved (PENDING → GENERATING_ASSETS)
+    // Start the pipeline when job is approved (PENDING → GENERATING_ASSETS or QUEUED)
     if (status === JobStatus.PENDING) {
-      this.updateStatus(id, JobStatus.GENERATING_ASSETS);
-    } else if (status === JobStatus.GENERATING_ASSETS) {
-      this.processJob(id).catch(err => {
-        console.error(`[JobManager] Pipeline error for ${id}:`, err);
-        this.updateStatus(id, JobStatus.FAILED, err.message);
+      // Try to get GPU immediately, or queue if busy
+      // The gpuQueue runner callback triggers processJob — do NOT call processJob again
+      // in the GENERATING_ASSETS branch below to avoid duplicate concurrent execution.
+      const startedImmediately = gpuQueue.enqueue(id, async () => {
+        this.updateStatus(id, JobStatus.GENERATING_ASSETS);
+        await this.processJob(id);
       });
+      if (!startedImmediately) {
+        return this.updateStatus(id, JobStatus.QUEUED);
+      }
     }
     return job;
+  }
+
+  // ─── Preflight Health Check ──────────────────────────────────────────────
+
+  private async preflightCheck(scenes: any[]): Promise<{ ok: boolean; errors: string[] }> {
+    const errors: string[] = [];
+    const TTS_URL = process.env.QWEN_TTS_URL || 'http://127.0.0.1:9000';
+    const hasVideoScenes = scenes.some(s => s.type === 'video');
+
+    // Check AI Worker
+    try {
+      const r = await fetch(`${AI_WORKER_URL}/health`, { signal: AbortSignal.timeout(3000) });
+      if (!r.ok) errors.push(`AI Worker (${AI_WORKER_URL}) respondió ${r.status}`);
+    } catch {
+      errors.push(`AI Worker (${AI_WORKER_URL}) no responde — levantalo con: cd apps/ai-worker && .venv/Scripts/python -m uvicorn main:app --port 8000`);
+    }
+
+    // Check TTS
+    try {
+      const r = await fetch(`${TTS_URL}/health`, { signal: AbortSignal.timeout(3000) });
+      if (!r.ok) errors.push(`TTS (${TTS_URL}) respondió ${r.status}`);
+    } catch {
+      errors.push(`TTS (${TTS_URL}) no responde — el audio no se va a generar`);
+    }
+
+    // Check ComfyUI only if there are video scenes
+    if (hasVideoScenes) {
+      try {
+        const r = await fetch('http://127.0.0.1:8189/system_stats', { signal: AbortSignal.timeout(3000) });
+        if (!r.ok) errors.push(`ComfyUI (8189) respondió ${r.status}`);
+      } catch {
+        errors.push(`ComfyUI (8189) no responde — los videos IA no se van a generar`);
+      }
+    }
+
+    if (errors.length > 0) {
+      console.error(`[JobManager] ❌ Preflight FAILED:\n  - ${errors.join('\n  - ')}`);
+    } else {
+      console.log('[JobManager] ✅ Preflight OK: AI Worker, TTS, ComfyUI all online');
+    }
+
+    return { ok: errors.length === 0, errors };
   }
 
   // ─── Pipeline ────────────────────────────────────────────────────────────
@@ -169,6 +216,15 @@ export class JobManager {
     const totalScenes = scenes.length;
     const videoScenes = scenes.filter(s => s.type === 'video').length;
     console.log(`[JobManager] ${totalScenes} scenes total: ${videoScenes} video, ${totalScenes - videoScenes} presentation`);
+
+    // ── PREFLIGHT: verify all services are online ───────────────────────────
+    const preflight = await this.preflightCheck(scenes);
+    if (!preflight.ok) {
+      const errorMsg = `Servicios caídos:\n${preflight.errors.join('\n')}`;
+      this.updateStatus(jobId, JobStatus.FAILED, errorMsg);
+      // Throw to exit the runner — gpuQueue's .finally() will release the GPU lock
+      throw new Error(errorMsg);
+    }
 
     let videoScenesDone = 0;
 
@@ -193,12 +249,12 @@ export class JobManager {
 
       // ── TTS Audio for ALL scene types ────────────────────────────────────
       try {
-        const rawAudioUrl = await this.aiWorker.generateAudio(scene.sceneId, scene.narration, scene.voiceOptions);
+        const audioResult = await this.aiWorker.generateAudio(scene.sceneId, scene.narration, scene.voiceOptions);
+        
         // Download WAV from AI Worker → save to backend/public/audio → serve at port 3001
-        // Remotion renders from the same server (localhost:3001) so this avoids cross-origin issues
-        const filename = rawAudioUrl.split('/').pop()!;
+        const filename = audioResult.audioUrl.split('/').pop()!;
         const localPath = path.join(AUDIO_PUBLIC_DIR, filename);
-        const audioResp = await fetch(rawAudioUrl);
+        const audioResp = await fetch(audioResult.audioUrl);
         if (audioResp.ok) {
           const buffer = Buffer.from(await audioResp.arrayBuffer());
           fs.writeFileSync(localPath, buffer);
@@ -206,7 +262,20 @@ export class JobManager {
           const backendAudioUrl = `http://localhost:${backendPort}/audio/${filename}`;
           scene.audioPath = backendAudioUrl;
           scene.audioUrl = backendAudioUrl;
-          console.log(`[JobManager] ✓ Audio for scene ${scene.sceneId} → ${backendAudioUrl}`);
+
+          // ── AUDIO SYNC FIX: actualizar durationSeconds con la duración REAL del audio ──
+          // Esto elimina los silencios de 20+ seg causados por duraciones mal estimadas por el LLM
+          if (audioResult.durationMs > 0) {
+            const realDurationSeconds = audioResult.durationMs / 1000;
+            const prevDuration = scene.durationSeconds;
+            // Usar la duración real + 0.3s de margen para que no se corte
+            scene.durationSeconds = Math.round((realDurationSeconds + 0.3) * 10) / 10;
+            if (Math.abs(scene.durationSeconds - prevDuration) > 0.5) {
+              console.log(`[JobManager] ⏱ Audio sync fix scene ${scene.sceneId}: ${prevDuration}s → ${scene.durationSeconds}s (real audio: ${realDurationSeconds.toFixed(2)}s)`);
+            }
+          }
+
+          console.log(`[JobManager] ✓ Audio for scene ${scene.sceneId} → ${backendAudioUrl} (${scene.durationSeconds}s)`);
         } else {
           console.warn(`[JobManager] ⚠ Could not download audio for ${scene.sceneId}: ${audioResp.status}`);
         }
@@ -214,17 +283,70 @@ export class JobManager {
         console.warn(`[JobManager] ⚠ Audio skipped for ${scene.sceneId}: ${audioErr.message}`);
       }
 
-      // ── Wan 2.2 Video — ONLY for type="video" scenes ─────────────────────
+
+      // ── FLUX 2 → Wan 2.2 I2V — ONLY for type="video" scenes ─────────────
       if (scene.type === 'video' && scene.visualPrompt) {
+        let inputImageFilename: string | undefined;
+
+        // ━━━ Step 1: FLUX 2 keyframe image ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        console.log(`[JobManager] 🎨 Step 1/3: Generating FLUX 2 keyframe for scene ${scene.sceneId}...`);
         try {
-          const videoResp = await this.aiWorker.generateVideo(scene.sceneId, scene.visualPrompt);
+          const imageResult = await this.aiWorker.generateImage(scene.sceneId, scene.visualPrompt);
+          inputImageFilename = imageResult.imageFilename;
+        } catch (imgErr: any) {
+          console.error(`[JobManager] ✗ FLUX 2 image generation FAILED for ${scene.sceneId}: ${imgErr.message}`);
+          // Don't silently fallback — warn clearly but continue with T2V as last resort
+        }
+
+        // ━━━ Step 2: VERIFY FLUX image was created ━━━━━━━━━━━━━━━━━━━━━━━
+        if (inputImageFilename && inputImageFilename.length > 0) {
+          console.log(`[JobManager] ✅ Step 2/3: FLUX keyframe VERIFIED → "${inputImageFilename}"`);
+          console.log(`[JobManager]    Pipeline mode: FLUX 2 → Wan 2.2 I2V (image-to-video)`);
+        } else {
+          console.error(`[JobManager] ❌ Step 2/3: FLUX keyframe NOT CREATED — no image filename returned`);
+          console.error(`[JobManager]    Pipeline mode: FALLBACK to Wan 2.2 T2V (text-to-video) — VIDEO QUALITY WILL BE LOWER`);
+          console.error(`[JobManager]    To fix: check ComfyUI logs, verify FLUX 2 models are loaded (flux-2-klein-4b, qwen_3_4b, flux2-vae)`);
+        }
+
+        // ━━━ Step 3: Wan 2.2 Video (I2V if image exists, T2V otherwise) ━━
+        const pipelineMode = inputImageFilename ? 'FLUX→I2V' : 'T2V-FALLBACK';
+        console.log(`[JobManager] 🎬 Step 3/3: Wan 2.2 video [${pipelineMode}] for scene ${scene.sceneId}...`);
+        try {
+          const videoResp = await this.aiWorker.generateVideo(
+            scene.sceneId,
+            scene.visualPrompt,
+            undefined,
+            inputImageFilename // undefined → T2V, filename → I2V
+          );
           scene.assetPath = videoResp.asset_path;
           scene.assetUrl = `${AI_WORKER_URL}/assets/${videoResp.asset_path}`;
           videoScenesDone++;
-          console.log(`[JobManager] ✓ Video for scene ${scene.sceneId} (${videoScenesDone}/${videoScenes})`);
+
+          // Final verification: check video asset exists
+          if (scene.assetPath && scene.assetPath.length > 0) {
+            console.log(`[JobManager] ✅ Video VERIFIED for ${scene.sceneId} → ${scene.assetPath} [${pipelineMode}] (${videoScenesDone}/${videoScenes})`);
+          } else {
+            console.error(`[JobManager] ❌ Video response OK but assetPath is empty for ${scene.sceneId}!`);
+          }
         } catch (vidErr: any) {
-          console.error(`[JobManager] ✗ Video failed for ${scene.sceneId}:`, vidErr.message);
-          // Don't fail the whole job — Remotion will show a placeholder
+          console.error(`[JobManager] ✗ Video generation FAILED for ${scene.sceneId} [${pipelineMode}]: ${vidErr.message}`);
+        }
+      }
+
+      // ── FLUX 2 ONLY — for type="image" scenes (still + camera effect) ──
+      if (scene.type === 'image' && scene.imagePrompt) {
+        console.log(`[JobManager] 🖼 Image scene ${scene.sceneId}: FLUX only (effect: ${scene.imageEffect || 'ken_burns'})`);
+        try {
+          const imageResult = await this.aiWorker.generateImage(scene.sceneId, scene.imagePrompt);
+          if (imageResult.imageFilename && imageResult.imageFilename.length > 0) {
+            scene.assetPath = imageResult.imagePath;
+            scene.assetUrl = `${AI_WORKER_URL}/assets/${imageResult.imagePath}`;
+            console.log(`[JobManager] ✅ Image scene READY: ${scene.sceneId} → ${imageResult.imageFilename}`);
+          } else {
+            console.error(`[JobManager] ❌ Image scene: FLUX returned no filename for ${scene.sceneId}`);
+          }
+        } catch (imgErr: any) {
+          console.error(`[JobManager] ✗ Image scene FLUX FAILED for ${scene.sceneId}: ${imgErr.message}`);
         }
       }
 

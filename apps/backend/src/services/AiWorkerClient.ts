@@ -7,7 +7,13 @@ const AI_WORKER_URL = process.env.AI_WORKER_URL || 'http://localhost:8000';
 export interface AudioGenerationResponse {
   scene_id: string;
   audio_path: string;
+  duration_ms: number;    // duración real del audio medida por Kokoro TTS
   provider: string;
+}
+
+export interface AudioResult {
+  audioUrl: string;
+  durationMs: number;     // en milisegundos, para actualizar scene.durationSeconds
 }
 
 export interface VideoGenerationResponse {
@@ -15,6 +21,19 @@ export interface VideoGenerationResponse {
   prompt_id?: string;
   asset_path: string;
   provider: string;
+}
+
+export interface ImageGenerationResponse {
+  scene_id: string;
+  prompt_id?: string;
+  image_path: string;
+  image_filename: string;
+  provider: string;
+}
+
+export interface ImageResult {
+  imagePath: string;       // relative path in AI Worker assets
+  imageFilename: string;   // filename for ComfyUI LoadImage node
 }
 
 export class AiWorkerClient {
@@ -33,43 +52,60 @@ export class AiWorkerClient {
     return AiWorkerClient.instance;
   }
 
-  public async generateAudio(sceneId: string, text: string, voiceOptions?: any): Promise<string> {
-    console.log(`[AiWorkerClient] Generating audio with Qwen3-TTS for scene: ${sceneId}`);
+  public async generateAudio(sceneId: string, text: string, voiceOptions?: any): Promise<AudioResult> {
+    console.log(`[AiWorkerClient] Generating audio with Kokoro TTS for scene: ${sceneId}`);
     const response = await this.client.post<AudioGenerationResponse>('/api/generate/audio', {
       scene_id: sceneId,
       text,
       voice_options: {
         speed: voiceOptions?.speed || 1.0,
         language: voiceOptions?.language || 'es',
-        voice_id: voiceOptions?.voiceId || 'default',
-        voice_description: voiceOptions?.description || "A professional, clear male voice."
+        voice_id: voiceOptions?.voiceId || null,
       },
       output_filename_prefix: 'narration'
     });
-    
-    // /assets/internal/ maps to apps/ai-worker/assets/ (internal mount in main.py)
-    return `${AI_WORKER_URL}/assets/internal/${response.data.audio_path}`;
+
+    const audioUrl = `${AI_WORKER_URL}/assets/internal/${response.data.audio_path}`;
+    const durationMs = response.data.duration_ms || 0;
+    console.log(`[AiWorkerClient] Audio ready: ${audioUrl} | duration: ${(durationMs/1000).toFixed(2)}s`);
+    return { audioUrl, durationMs };
   }
 
-  private _loadWorkflow(): any {
+  private _loadWorkflow(type: 'i2v' | 't2v' | 'flux' = 't2v'): any {
     try {
-      // USE_TEST_WORKFLOW=true → loads 9-frame/3-step test workflow (~2 min render)
+      if (type === 'flux') {
+        const fluxPath = path.resolve(__dirname, '../workflows/flux_2_image_workflow.json');
+        if (fs.existsSync(fluxPath)) {
+          console.log(`[AiWorkerClient] Loaded FLUX 2 Klein image workflow`);
+          return JSON.parse(fs.readFileSync(fluxPath, 'utf-8'));
+        }
+        console.warn(`[AiWorkerClient] FLUX workflow not found!`);
+        return {};
+      }
+
+      if (type === 'i2v') {
+        const i2vPath = path.resolve(__dirname, '../workflows/wan_2.2_i2v_workflow.json');
+        if (fs.existsSync(i2vPath)) {
+          console.log(`[AiWorkerClient] Loaded Wan 2.2 I2V workflow`);
+          return JSON.parse(fs.readFileSync(i2vPath, 'utf-8'));
+        }
+        console.warn(`[AiWorkerClient] I2V workflow not found, falling back to T2V`);
+      }
+
+      // Check for test workflow (fast: 3 steps, 9 frames)
       if (process.env.USE_TEST_WORKFLOW === 'true') {
         const testPath = path.resolve(__dirname, '../workflows/wan_2.2_test_workflow.json');
         if (fs.existsSync(testPath)) {
-          console.log('[AiWorkerClient] TEST MODE: Loaded 9-frame/3-step test workflow');
+          console.log(`[AiWorkerClient] Loaded Wan 2.2 TEST workflow (3 steps, 9 frames — fast mode)`);
           return JSON.parse(fs.readFileSync(testPath, 'utf-8'));
         }
       }
+
+      // Default: T2V (text-to-video) workflow
       const workflowPath = path.resolve(__dirname, '../workflows/wan_2.2_workflow.json');
       if (fs.existsSync(workflowPath)) {
-        console.log(`[AiWorkerClient] SUCCESS: Loaded Wan 2.2 workflow (size: ${fs.statSync(workflowPath).size} bytes)`);
+        console.log(`[AiWorkerClient] Loaded Wan 2.2 T2V workflow`);
         return JSON.parse(fs.readFileSync(workflowPath, 'utf-8'));
-      }
-      const fallbackPath = path.resolve(__dirname, '../workflows/wan_2.1_workflow.json');
-      if (fs.existsSync(fallbackPath)) {
-        console.log(`[AiWorkerClient] FALLBACK: Loaded Wan 2.1 workflow`);
-        return JSON.parse(fs.readFileSync(fallbackPath, 'utf-8'));
       }
     } catch (err) {
       console.error('[AiWorkerClient] Failed to load workflow file:', err);
@@ -78,20 +114,76 @@ export class AiWorkerClient {
   }
 
   /**
+   * Generate a photorealistic keyframe image using FLUX 2 Klein.
+   * Returns the image filename that can be used with Wan 2.2 I2V's LoadImage node.
+   */
+  public async generateImage(sceneId: string, imagePrompt: string): Promise<ImageResult> {
+    console.log(`[AiWorkerClient] Generating FLUX 2 keyframe for scene: ${sceneId}`);
+
+    const rawWorkflow = this._loadWorkflow('flux');
+
+    // Strip top-level keys starting with _ (metadata only, crash ComfyUI if sent)
+    const workflow: any = {};
+    for (const key of Object.keys(rawWorkflow)) {
+      if (!key.startsWith('_')) workflow[key] = rawWorkflow[key];
+    }
+
+    // Inject prompt into Node 3 (CLIPTextEncode positive)
+    if (workflow?.['3']?.inputs?.text !== undefined) {
+      workflow['3'].inputs.text = imagePrompt;
+      console.log(`[AiWorkerClient] Injected image prompt into FLUX Node 3: "${imagePrompt.slice(0, 80)}…"`);
+    } else {
+      console.warn(`[AiWorkerClient] ⚠ Could not find FLUX prompt node!`);
+    }
+
+    // Randomize seed
+    if (workflow?.['10']?.inputs?.noise_seed !== undefined) {
+      workflow['10'].inputs.noise_seed = Math.floor(Math.random() * 2147483647);
+    }
+
+    const response = await this.client.post<ImageGenerationResponse>('/api/generate/image', {
+      scene_id: sceneId,
+      visual_prompt: imagePrompt,
+      workflow,
+      output_filename_prefix: 'keyframe',
+    }, { timeout: 300000 }); // 5 min timeout for image
+
+    console.log(`[AiWorkerClient] ✓ FLUX keyframe ready: ${response.data.image_filename}`);
+    return {
+      imagePath: response.data.image_path,
+      imageFilename: response.data.image_filename,
+    };
+  }
+
+  /**
    * Generate video using the NON-BLOCKING queue+poll pattern.
    *
    * - Step 1: POST /api/generate/video/queue → returns prompt_id immediately (no timeout risk)
    * - Step 2: Poll GET /api/generate/video/wait/{prompt_id} every 15s until done
    */
-  public async generateVideo(sceneId: string, visualPrompt: string, workflow?: any): Promise<VideoGenerationResponse> {
+  public async generateVideo(sceneId: string, visualPrompt: string, workflow?: any, inputImage?: string): Promise<VideoGenerationResponse> {
     console.log(`[AiWorkerClient] Queueing video (non-blocking) for scene: ${sceneId}`);
 
-    let realWorkflow = workflow || this._loadWorkflow();
+    let realWorkflow = workflow || this._loadWorkflow(inputImage ? 'i2v' : 't2v');
 
-    // Inject the visual prompt into the workflow
-    if (realWorkflow?.['4']?.inputs?.positive_prompt) {
+    // Inject visual prompt — try T2V workflow (Node 4 = WanVideoTextEncode) first
+    if (realWorkflow?.['4']?.inputs?.positive_prompt !== undefined) {
       realWorkflow['4'].inputs.positive_prompt = realWorkflow['4'].inputs.positive_prompt.replace('[PROMPT]', visualPrompt);
-      console.log(`[AiWorkerClient] Injected prompt into Node 4: ${visualPrompt}`);
+      console.log(`[AiWorkerClient] Injected prompt into Node 4 (WanVideoTextEncode T2V): "${visualPrompt.slice(0, 80)}…"`);
+    }
+    // Fallback: I2V workflow (Node 9 = CLIPTextEncode)
+    else if (realWorkflow?.['9']?.inputs?.text !== undefined) {
+      realWorkflow['9'].inputs.text = realWorkflow['9'].inputs.text.replace('[PROMPT]', visualPrompt);
+      console.log(`[AiWorkerClient] Injected prompt into Node 9 (CLIPTextEncode I2V): "${visualPrompt.slice(0, 80)}…"`);
+    }
+    else {
+      console.warn(`[AiWorkerClient] ⚠ Could not find a prompt node to inject into! Workflow may use default placeholder.`);
+    }
+
+    // Inject start image for I2V (Node 11 = LoadImage)
+    if (inputImage && realWorkflow?.['11']?.inputs !== undefined) {
+      realWorkflow['11'].inputs.image = inputImage;
+      console.log(`[AiWorkerClient] Injected start_image into Node 11 (LoadImage): ${inputImage}`);
     }
 
     // Step 1: Queue the job — returns prompt_id in under 1 second
