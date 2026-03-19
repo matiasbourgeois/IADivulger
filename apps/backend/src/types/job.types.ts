@@ -11,7 +11,7 @@ export enum JobStatus {
 
 // ─── Scene types ─────────────────────────────────────────────────────────────
 
-export type SceneType = 'presentation' | 'video' | 'image';
+export type SceneType = 'presentation' | 'video' | 'image' | 'web_image';
 
 export type SlideStyle = 'title' | 'bullets' | 'quote' | 'stats' | 'transition' | 'chapter' | 'bar_chart';
 
@@ -51,6 +51,9 @@ export interface Scene {
 
   // For type='image' — FLUX still image with camera effect
   imagePrompt?: string;
+  
+  // For type='web_image' — real photo from Pexels/Wikipedia
+  webImageUrl?: string;        // Direct URL to the stock photo
   imageEffect?: 'zoom_in' | 'zoom_out' | 'pan_left' | 'pan_right' | 'ken_burns';
   
   voiceOptions: VoiceOptions;
@@ -58,7 +61,7 @@ export interface Scene {
   audioUrl?: string;         // Full URL for frontend
   assetPath?: string;        // Local path (video/image type)
   assetUrl?: string;         // Full URL (video/image type)
-  sourceUrls?: string[];     // Web sources used in narration (from Tavily)
+  sourceUrls?: string[];     // Web sources used in narration (from Tavily/Wikipedia)
 }
 
 export interface ProjectScript {

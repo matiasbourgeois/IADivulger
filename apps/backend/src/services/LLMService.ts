@@ -1,6 +1,8 @@
 import { ProjectPayload, Scene, SceneType, SlideStyle } from '../types/job.types';
 import { v4 as uuidv4 } from 'uuid';
 import { TavilyService } from './TavilyService';
+import { WikipediaService } from './WikipediaService';
+import { PexelsService } from './PexelsService';
 import '../config';
 
 // ─── API endpoints ────────────────────────────────────────────────────────────
@@ -28,12 +30,13 @@ interface GenerateOptions {
 }
 
 interface LLMScene {
-  type: 'presentation' | 'video' | 'image';
+  type: 'presentation' | 'video' | 'image' | 'web_image';
   narration: string;
   durationSeconds: number;
   visualPrompt?: string;
   imagePrompt?: string;
   imageEffect?: string;
+  webImageUrl?: string;     // Real photo URL from Pexels/Wikipedia
   slide?: {
     headline: string;
     bodyText?: string;
@@ -60,9 +63,10 @@ interface SceneDistribution {
   totalScenes: number;
   slides: number;
   videos: number;
-  images: number;                // scenes with FLUX still + camera effect
-  avgNarrationWords: number;     // target words per slide narration
-  videoNarrationWords: number;   // target words per video narration
+  images: number;                // FLUX AI-generated still images
+  webImages: number;             // Real photos from Pexels/Wikipedia
+  avgNarrationWords: number;
+  videoNarrationWords: number;
 }
 
 /**
@@ -71,30 +75,30 @@ interface SceneDistribution {
  * At ~2.5 words/second narration speed, we calibrate word counts to fill the time.
  */
 function computeDistribution(durationMinutes: number): SceneDistribution {
-  // Breakpoint table: [minutes, totalScenes, slides, videos, images, avgWords, videoWords]
-  const table: [number, number, number, number, number, number, number][] = [
-    [1,  4,  2,  1,  1,  50,  20],
-    [2,  6,  3,  1,  2,  70,  20],
-    [3,  8,  4,  1,  3,  80,  25],
-    [5,  10, 5,  2,  3,  100, 25],
-    [7,  12, 7,  2,  3,  110, 25],
-    [10, 16, 10, 2,  4,  120, 30],
-    [15, 20, 13, 2,  5,  130, 30],
+  // Breakpoint table: [minutes, totalScenes, slides, videos, images, webImages, avgWords, videoWords]
+  const table: [number, number, number, number, number, number, number, number][] = [
+    [1,  6,  2,  1,  1,  2,  40,  15],
+    [2,  10, 3,  1,  2,  4,  50,  15],
+    [3,  14, 4,  1,  3,  6,  55,  15],
+    [5,  20, 5,  2,  4,  9,  60,  20],
+    [7,  24, 7,  2,  5,  10, 70,  20],
+    [10, 30, 8,  2,  6,  14, 75,  25],
+    [15, 40, 12, 2,  8,  18, 80,  25],
   ];
 
   // Find surrounding breakpoints for interpolation
   if (durationMinutes <= table[0][0]) {
-    const [, total, slides, videos, images, avgW, vidW] = table[0];
-    return { totalScenes: total, slides, videos, images, avgNarrationWords: avgW, videoNarrationWords: vidW };
+    const [, total, slides, videos, images, webImages, avgW, vidW] = table[0];
+    return { totalScenes: total, slides, videos, images, webImages, avgNarrationWords: avgW, videoNarrationWords: vidW };
   }
   if (durationMinutes >= table[table.length - 1][0]) {
-    const [, total, slides, videos, images, avgW, vidW] = table[table.length - 1];
-    return { totalScenes: total, slides, videos, images, avgNarrationWords: avgW, videoNarrationWords: vidW };
+    const [, total, slides, videos, images, webImages, avgW, vidW] = table[table.length - 1];
+    return { totalScenes: total, slides, videos, images, webImages, avgNarrationWords: avgW, videoNarrationWords: vidW };
   }
 
   for (let i = 0; i < table.length - 1; i++) {
-    const [minA, totalA, slidesA, videosA, imagesA, wA, vwA] = table[i];
-    const [minB, totalB, slidesB, videosB, imagesB, wB, vwB] = table[i + 1];
+    const [minA, totalA, slidesA, videosA, imagesA, webImagesA, wA, vwA] = table[i];
+    const [minB, totalB, slidesB, videosB, imagesB, webImagesB, wB, vwB] = table[i + 1];
     if (durationMinutes >= minA && durationMinutes <= minB) {
       const t = (durationMinutes - minA) / (minB - minA);
       const lerp = (a: number, b: number) => Math.round(a + (b - a) * t);
@@ -103,6 +107,7 @@ function computeDistribution(durationMinutes: number): SceneDistribution {
         slides: lerp(slidesA, slidesB),
         videos: lerp(videosA, videosB),
         images: lerp(imagesA, imagesB),
+        webImages: lerp(webImagesA, webImagesB),
         avgNarrationWords: lerp(wA, wB),
         videoNarrationWords: lerp(vwA, vwB),
       };
@@ -110,7 +115,7 @@ function computeDistribution(durationMinutes: number): SceneDistribution {
   }
 
   // Fallback
-  return { totalScenes: 8, slides: 4, videos: 1, images: 3, avgNarrationWords: 80, videoNarrationWords: 25 };
+  return { totalScenes: 14, slides: 4, videos: 1, images: 3, webImages: 6, avgNarrationWords: 55, videoNarrationWords: 15 };
 }
 
 // Export for frontend preview endpoint
@@ -194,21 +199,23 @@ ESTRUCTURA REQUERIDA
 Generá exactamente ${dist.totalScenes} escenas con esta distribución OBLIGATORIA:
 - EXACTAMENTE ${dist.slides} escenas tipo "presentation" (slides animados con datos)
 - EXACTAMENTE ${dist.videos} escena(s) tipo "video" (clips cinemáticos con movimiento IA)
-- EXACTAMENTE ${dist.images} escena(s) tipo "image" (foto fotorrealista con efecto de cámara: zoom, pan, Ken Burns)
+- EXACTAMENTE ${dist.images} escena(s) tipo "image" (foto generada IA con efecto de cámara)
+- EXACTAMENTE ${dist.webImages} escena(s) tipo "web_image" (foto REAL de Pexels con efecto de cámara)
 
-🔴 NO generes más slides reemplazando imágenes. La distribución es OBLIGATORIA. Si pedí ${dist.images} imágenes, generá ${dist.images} imágenes.
+🔴 NO generes más slides reemplazando imágenes. La distribución es OBLIGATORIA.
+🔴 Cada escena debe durar MÁXIMO 20 segundos. Si una narración es larga, dividila en 2 escenas.
 
 DURACIÓN POR ESCENA:
-- Cada slide: narración de ${dist.avgNarrationWords}-${dist.avgNarrationWords + 30} palabras (~${Math.round(dist.avgNarrationWords / 2.5)}-${Math.round((dist.avgNarrationWords + 30) / 2.5)}s)
+- Cada slide: narración de ${dist.avgNarrationWords}-${dist.avgNarrationWords + 20} palabras (~${Math.round(dist.avgNarrationWords / 2.5)}-${Math.round((dist.avgNarrationWords + 20) / 2.5)}s)
 - Cada video: narración de ${dist.videoNarrationWords}-${dist.videoNarrationWords + 10} palabras (~7-10s)
-- Cada imagen: narración de 40-80 palabras (~15-25s)
+- Cada imagen/web_image: narración de 30-60 palabras (~10-20s)
 - TOTAL debe sumar ~${totalSeconds}s
 
-Distribución OBLIGATORIA (seguí este orden):
-1. SLIDE apertura (gancho fuerte, style "title")
-2. VIDEO intro cinemático
-3-${dist.totalScenes - 1}. Alterná SLIDES e IMÁGENES (intercalá 1 imagen cada 1-2 slides)
-Último: SLIDE cierre/CTA (style "transition")
+Distribución OBLIGATORIA (seguí este orden, intercalando tipos):
+1. SLIDE apertura (gancho fuerte, style "title") — MAX 15s
+2. WEB_IMAGE o VIDEO — visual impactante
+3-${dist.totalScenes - 1}. Alterná: SLIDE → WEB_IMAGE → SLIDE → IMAGE → WEB_IMAGE → SLIDE (nunca 2 slides seguidos)
+Último: SLIDE cierre/CTA (style "transition") — MAX 12s
 
 ═══════════════════════════════════════════════════════════
 REGLAS CRÍTICAS (si violás alguna, el guión es INÚTIL)
@@ -316,6 +323,14 @@ Respondé ÚNICAMENTE con JSON válido. Sin markdown, sin explicaciones, sin tex
       "sourceUrls": ["https://ejemplo.com/fuente"],
       "imagePrompt": "Photo of [SUJETO REAL Y CONCRETO], [ángulo de cámara], [iluminación], shot on Canon R5, 8K, photorealistic",
       "imageEffect": "ken_burns"
+    },
+    {
+      "type": "web_image",
+      "narration": "string — 30-60 palabras narrando sobre la imagen real",
+      "durationSeconds": 12,
+      "sourceUrls": [],
+      "webImageUrl": "https://images.pexels.com/photos/...",
+      "imageEffect": "zoom_in"
     }
   ]
 }
@@ -331,6 +346,19 @@ Son IDEALES para acompañar narración larga con un visual impactante sin necesi
 - "imageEffect" puede ser: "zoom_in" | "zoom_out" | "pan_left" | "pan_right" | "ken_burns"
   - zoom_in: ideal para revelar detalles (ej: close-up de manos, pantallas)
   - zoom_out: ideal para mostrar escala (ej: ciudades, laboratorios)
+
+═══════════════════════════════════════════════════════════
+ESCENAS TIPO "web_image" — FOTOS REALES
+═══════════════════════════════════════════════════════════
+
+Las escenas "web_image" usan FOTOS REALES descargadas de Pexels (profesionales, de alta calidad).
+Son MÁS RÁPIDAS que generar con IA y dan un toque de realismo al video.
+
+- "webImageUrl": poné la URL de la foto de Pexels de la sección FOTOS REALES DISPONIBLES.
+- Si no hay fotos de Pexels disponibles, usá tipo "image" en su lugar (se genera con IA).
+- "imageEffect": igual que en las escenas "image" — zoom_in, zoom_out, pan_left, pan_right, ken_burns
+- Duración: 8-20 segundos
+- Narración: 30-60 palabras
   - pan_left/pan_right: ideal para panoramas (ej: paisajes, multitudes)
   - ken_burns: efecto cinemático general (zoom + pan suave)
 - Duración: 10-25 segundos (acompaña narración larga)
@@ -339,11 +367,14 @@ Son IDEALES para acompañar narración larga con un visual impactante sin necesi
 ⚠ REGLAS FINALES (VIOLACIÓN = GUIÓN RECHAZADO):
 - "visualPrompt" es OBLIGATORIO para TODAS las escenas type "video". Sin visualPrompt, el video NO SE GENERA.
 - "imagePrompt" es OBLIGATORIO para TODAS las escenas type "image". Sin imagePrompt, la imagen NO SE GENERA.
+- "webImageUrl" es OBLIGATORIO para TODAS las escenas type "web_image". Usá las URLs de la sección FOTOS REALES.
 - "sourceUrls" SOLO debe contener URLs de la sección "DATOS REALES DE LA WEB". Si no hay URLs verificadas, usá array vacío [].
 - CADA escena DEBE empezar con una apertura DIFERENTE. VARIÁ el estilo narrativo.
 - El TONO debe ser de divulgador científico: informate, con autoridad, pero cercano. NUNCA sensacionalista.
-- 🔴 RESPETÁ la cantidad EXACTA de escenas tipo "image": ${dist.images}. NO las reemplaces con slides extra.
-- 🔴 NUNCA inventes fuentes (periódicos, universidades, papers) que no aparecen en los datos web verificados.`;
+- 🔴 RESPETÁ la cantidad EXACTA de escenas de cada tipo. NO reemplaces web_image con slides.
+- 🔴 Cada escena dura MÁXIMO 20 segundos. Dividí narraciones largas.
+- 🔴 NUNCA inventes fuentes que no aparecen en los datos web verificados.
+- 🔴 NUNCA pongas 2 slides seguidos. Alterná con imágenes entre medio.`;
 }
 
 // ─── API Callers ──────────────────────────────────────────────────────────────
@@ -756,37 +787,69 @@ export async function generateScript(opts: GenerateOptions): Promise<ProjectPayl
   const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
-  // ── Web search for real data (pre-LLM) ────────────────────────────────────
+  // ── Data gathering: Wikipedia + Tavily + Pexels (run in parallel) ──────────
   let webContext: string | undefined;
+  let wikiContext: string | undefined;
+  let pexelsContext: string | undefined;
 
-  // Option 1: Tavily (if configured)
-  if (process.env.TAVILY_API_KEY) {
-    try {
-      console.log(`[LLM] 🔍 Tavily search: "${opts.topic}"`);
-      const searchResult = await TavilyService.searchForTopic(opts.topic);
-      if (searchResult.results.length > 0) {
-        webContext = TavilyService.formatForPrompt(searchResult);
-        console.log(`[LLM] ✅ Tavily: ${searchResult.results.length} sources`);
-      }
-    } catch (err: any) {
-      console.warn(`[LLM] ⚠ Tavily failed: ${err.message}`);
-    }
-  }
+  // Run all data sources in parallel for speed
+  const [tavilyResult, wikiResult, pexelsResult] = await Promise.allSettled([
+    // Tavily — news/web search
+    process.env.TAVILY_API_KEY
+      ? (async () => {
+          console.log(`[LLM] 🔍 Tavily search: "${opts.topic}"`);
+          const r = await TavilyService.searchForTopic(opts.topic);
+          if (r.results.length > 0) {
+            console.log(`[LLM] ✅ Tavily: ${r.results.length} sources`);
+            return TavilyService.formatForPrompt(r);
+          }
+          return undefined;
+        })()
+      : Promise.resolve(undefined),
+    // Wikipedia — verified base knowledge (free, no API key)
+    (async () => {
+      console.log(`[LLM] 📚 Wikipedia search: "${opts.topic}"`);
+      const ctx = await WikipediaService.getContextForTopic(opts.topic);
+      if (ctx) console.log(`[LLM] ✅ Wikipedia: got context (${ctx.length} chars)`);
+      return ctx;
+    })(),
+    // Pexels — real stock photos (free, no attribution)
+    process.env.PEXELS_API_KEY
+      ? (async () => {
+          console.log(`[LLM] 🖼 Pexels search: "${opts.topic}"`);
+          const { photos } = await PexelsService.getPhotosForTopic(opts.topic, 8);
+          if (photos.length > 0) {
+            console.log(`[LLM] ✅ Pexels: ${photos.length} photos`);
+            return PexelsService.formatForPrompt(photos);
+          }
+          return undefined;
+        })()
+      : Promise.resolve(undefined),
+  ]);
 
-  // Option 2: Gemini grounding with Google Search (free, no extra key needed)
+  webContext = tavilyResult.status === 'fulfilled' ? tavilyResult.value : undefined;
+  wikiContext = wikiResult.status === 'fulfilled' ? wikiResult.value : undefined;
+  pexelsContext = pexelsResult.status === 'fulfilled' ? pexelsResult.value : undefined;
+
+  // Fallback: Gemini grounding if no Tavily results
   if (!webContext && GEMINI_API_KEY && !GEMINI_API_KEY.includes('your_')) {
     try {
       console.log(`[LLM] 🔍 Gemini grounding search: "${opts.topic}"`);
       webContext = await searchWithGeminiGrounding(opts.topic, GEMINI_API_KEY);
-      if (webContext) {
-        console.log(`[LLM] ✅ Gemini grounding: got web context`);
-      }
+      if (webContext) console.log(`[LLM] ✅ Gemini grounding: got web context`);
     } catch (err: any) {
       console.warn(`[LLM] ⚠ Gemini grounding failed: ${err.message}`);
     }
   }
 
-  const prompt = buildPrompt({ ...opts, webContext });
+  // Combine all contexts for the prompt
+  const combinedWebContext = [
+    wikiContext ? `📚 DATOS VERIFICADOS DE WIKIPEDIA:\n${wikiContext}` : '',
+    webContext || '',
+    pexelsContext || '',
+  ].filter(Boolean).join('\n\n') || undefined;
+
+  const prompt = buildPrompt({ ...opts, webContext: combinedWebContext });
 
   // ── Provider chain: Gemini 3 Pro → Claude → Gemini 2.5 Pro → fallback ──
   const providers: Array<{
@@ -830,6 +893,7 @@ export async function generateScript(opts: GenerateOptions): Promise<ProjectPayl
     visualPrompt: s.visualPrompt,
     imagePrompt: s.imagePrompt,
     imageEffect: s.imageEffect as any,
+    webImageUrl: s.webImageUrl,
     slide: s.slide ? {
       ...s.slide,
       style: (s.slide.style || 'bullets') as SlideStyle,

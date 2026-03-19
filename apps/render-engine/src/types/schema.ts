@@ -1,4 +1,4 @@
-export type SceneType = 'presentation' | 'video' | 'image';
+export type SceneType = 'presentation' | 'video' | 'image' | 'web_image';
 export type SlideStyle = 'title' | 'bullets' | 'quote' | 'stats' | 'transition' | 'chapter' | 'bar_chart';
 
 export interface SlideData {
@@ -31,6 +31,7 @@ export interface RenderScene {
   durationInSeconds: number;
   slide?: SlideData;      // For type='presentation' scenes
   imageEffect?: 'zoom_in' | 'zoom_out' | 'pan_left' | 'pan_right' | 'ken_burns';
+  webImageUrl?: string;     // Real photo URL from Pexels/Wikipedia
   sourceUrls?: string[];  // Tavily web sources
 }
 

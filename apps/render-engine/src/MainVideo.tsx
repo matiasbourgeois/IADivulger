@@ -25,7 +25,7 @@ export const MainVideo: React.FC<{ payload: any; format: any }> = ({ payload, fo
           <Series.Sequence key={`${scene.sceneId || index}`} durationInFrames={dur}>
             {scene.type === 'presentation'
               ? <PresentationSlide scene={scene} />
-              : scene.type === 'image'
+              : scene.type === 'image' || scene.type === 'web_image'
               ? <ImageScene scene={scene} />
               : <VideoScene scene={scene} format={format || '16:9'} />
             }

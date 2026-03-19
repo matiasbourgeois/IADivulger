@@ -15,12 +15,13 @@ export class RemotionService {
         sceneId: s.sceneId,
         type: s.type || 'video',
         narrationText: s.narration,
-        assetUrl: s.assetUrl || '',
+        assetUrl: s.assetUrl || (s.type === 'web_image' ? s.webImageUrl : '') || '',
         audioUrl: s.audioUrl || '',
         durationInSeconds: s.durationSeconds,
         slide: s.slide,
-        imageEffect: s.imageEffect,     // Camera effect for image scenes
-        sourceUrls: s.sourceUrls,       // Tavily web sources → badge overlay
+        imageEffect: s.imageEffect,     // Camera effect for image/web_image scenes
+        webImageUrl: s.webImageUrl,      // Original Pexels/Wikipedia URL
+        sourceUrls: s.sourceUrls,       // Web sources → badge overlay
       }))
     };
   }
