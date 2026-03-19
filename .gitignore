@@ -84,15 +84,17 @@ Thumbs.db
 *.log
 apps/backend/public/outputs/
 apps/backend/public/audio/
-apps/ai-worker/assets/audio/
-apps/ai-worker/assets/video/
-apps/ai-worker/assets/image/
+apps/ai-worker/assets/
 apps/ai-worker/worker_full.log
 apps/comfyui/*.log
 apps/dashboard/*.log
 apps/tts-server/*.log
 
-# Temp files
+# Generated data (persistence)
+apps/backend/data/jobs.json
+
+# Debug / temp files
+apps/ai-worker/debug_*.json
 _generated_root_*.tsx
 _test_root_*.tsx
 test_*.mp4
@@ -104,3 +106,8 @@ __pycache__/
 # AI Models
 apps/tts-server/model/
 apps/comfyui/models/
+
+# ComfyUI runtime
+apps/comfyui/input/
+apps/comfyui/output/
+apps/comfyui/temp/
