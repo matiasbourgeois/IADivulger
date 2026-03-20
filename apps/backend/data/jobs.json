@@ -7852,7 +7852,7 @@
   },
   {
     "id": "2d8cdb2b-dc3b-428e-9770-f38a87427fd0",
-    "status": "GENERATING_ASSETS",
+    "status": "RENDERING",
     "payload": {
       "projectId": "805999f0-be8e-44ba-b142-b9d6dad736fd",
       "title": "Limpieza Facial Profunda: Guía Paso a Paso Casera",
@@ -8103,7 +8103,7 @@
             "sceneId": "s13",
             "type": "web_image",
             "narration": "Por la mañana, solo necesitás un gel limpiador suave. Durante la noche la piel libera toxinas y células muertas que deben eliminarse antes de aplicar protector solar.",
-            "durationSeconds": 10,
+            "durationSeconds": 10.3,
             "imageEffect": "zoom_out",
             "webImageUrl": "https://images.pexels.com/photos/5240454/pexels-photo-5240454.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
             "sourceUrls": [
@@ -8112,13 +8112,15 @@
             "voiceOptions": {
               "speed": 1,
               "language": "es"
-            }
+            },
+            "audioPath": "http://localhost:3001/audio/narration_s13_1773983774342.wav",
+            "audioUrl": "http://localhost:3001/audio/narration_s13_1773983774342.wav"
           },
           {
             "sceneId": "s14",
             "type": "presentation",
             "narration": "Los resultados se ven después de dos semanas de rutina constante. La piel se ve más luminosa, los poros menos visibles y la textura notablemente más suave. La clave está en la constancia y usar productos adecuados para tu tipo de piel. Recordá que cada piel es única y puede necesitar ajustes en la frecuencia o productos utilizados.",
-            "durationSeconds": 10,
+            "durationSeconds": 19.5,
             "slide": {
               "headline": "Resultados Esperados",
               "bulletPoints": [
@@ -8135,52 +8137,62 @@
             "voiceOptions": {
               "speed": 1,
               "language": "es"
-            }
+            },
+            "audioPath": "http://localhost:3001/audio/narration_s14_1773983776422.wav",
+            "audioUrl": "http://localhost:3001/audio/narration_s14_1773983776422.wav"
           },
           {
             "sceneId": "s15",
             "type": "web_image",
             "narration": "Evitá estos errores comunes: usar agua muy caliente, frotar con fuerza la piel húmeda, aplicar demasiado producto o saltear la hidratación final.",
-            "durationSeconds": 9,
+            "durationSeconds": 9.3,
             "imageEffect": "pan_right",
             "webImageUrl": "https://images.pexels.com/photos/5240372/pexels-photo-5240372.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
             "sourceUrls": [],
             "voiceOptions": {
               "speed": 1,
               "language": "es"
-            }
+            },
+            "audioPath": "http://localhost:3001/audio/narration_s15_1773983777597.wav",
+            "audioUrl": "http://localhost:3001/audio/narration_s15_1773983777597.wav"
           },
           {
             "sceneId": "s16",
             "type": "image",
             "narration": "Si tenés piel muy sensible, empezá haciendo esta rutina completa solo dos veces por semana. Gradualmente podés aumentar la frecuencia según cómo responda tu piel. Siempre escuchá las señales que te da tu rostro.",
-            "durationSeconds": 10,
+            "durationSeconds": 12.9,
             "imagePrompt": "Photo of woman with sensitive skin gently touching her face, soft natural lighting, peaceful bathroom environment, gentle skincare moment, shot on Canon R5, 8K, photorealistic, NO TEXT NO WORDS NO LETTERS",
             "imageEffect": "zoom_in",
             "sourceUrls": [],
             "voiceOptions": {
               "speed": 1,
               "language": "es"
-            }
+            },
+            "audioPath": "http://localhost:3001/audio/narration_s16_1773983779114.wav",
+            "audioUrl": "http://localhost:3001/audio/narration_s16_1773983779114.wav",
+            "assetPath": "images/keyframe_s16.png",
+            "assetUrl": "http://localhost:8000/assets/images/keyframe_s16.png"
           },
           {
             "sceneId": "s17",
             "type": "web_image",
             "narration": "Mantené todos los productos en lugares frescos y secos. Los frascos abiertos de sueros y cremas duran máximo seis meses para mantener su efectividad.",
-            "durationSeconds": 10,
+            "durationSeconds": 9.5,
             "imageEffect": "zoom_in",
             "webImageUrl": "https://images.pexels.com/photos/7321363/pexels-photo-7321363.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
             "sourceUrls": [],
             "voiceOptions": {
               "speed": 1,
               "language": "es"
-            }
+            },
+            "audioPath": "http://localhost:3001/audio/narration_s17_1773983859419.wav",
+            "audioUrl": "http://localhost:3001/audio/narration_s17_1773983859419.wav"
           },
           {
             "sceneId": "s18",
             "type": "web_image",
             "narration": "El mercado global de cuidado facial mueve más de 200 mil millones de dólares anuales, pero la técnica correcta es más importante que productos caros.",
-            "durationSeconds": 10,
+            "durationSeconds": 9.4,
             "imageEffect": "ken_burns",
             "webImageUrl": "https://images.pexels.com/photos/7622924/pexels-photo-7622924.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
             "sourceUrls": [
@@ -8189,26 +8201,30 @@
             "voiceOptions": {
               "speed": 1,
               "language": "es"
-            }
+            },
+            "audioPath": "http://localhost:3001/audio/narration_s18_1773983860617.wav",
+            "audioUrl": "http://localhost:3001/audio/narration_s18_1773983860617.wav"
           },
           {
             "sceneId": "s19",
             "type": "web_image",
             "narration": "Recordá que una buena limpieza facial nocturna es la base de cualquier rutina de skincare efectiva. La constancia y técnica correcta superan siempre los productos más costosos.",
-            "durationSeconds": 10,
+            "durationSeconds": 10.8,
             "imageEffect": "fade_out",
             "webImageUrl": "https://images.pexels.com/photos/3985329/pexels-photo-3985329.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
             "sourceUrls": [],
             "voiceOptions": {
               "speed": 1,
               "language": "es"
-            }
+            },
+            "audioPath": "http://localhost:3001/audio/narration_s19_1773983861985.wav",
+            "audioUrl": "http://localhost:3001/audio/narration_s19_1773983861985.wav"
           },
           {
             "sceneId": "s20",
             "type": "presentation",
             "narration": "Ahora tenés todo lo necesario para hacer una limpieza facial profunda desde casa. Comenzá esta noche y en dos semanas vas a notar la diferencia. Si te sirvió esta guía, dale like y suscribite para más consejos de skincare casero. Tu piel te va a agradecer.",
-            "durationSeconds": 10,
+            "durationSeconds": 15.3,
             "slide": {
               "headline": "Comenzá Hoy Mismo",
               "bodyText": "Dale like si te sirvió esta guía completa de limpieza facial profunda. Suscribite para más consejos de skincare casero y rutinas dermatológicamente probadas.",
@@ -8220,7 +8236,9 @@
             "voiceOptions": {
               "speed": 1,
               "language": "es"
-            }
+            },
+            "audioPath": "http://localhost:3001/audio/narration_s20_1773983863725.wav",
+            "audioUrl": "http://localhost:3001/audio/narration_s20_1773983863725.wav"
           }
         ]
       },
@@ -8240,7 +8258,7 @@
       }
     },
     "createdAt": "2026-03-20T05:11:16.903Z",
-    "updatedAt": "2026-03-20T05:11:53.116Z",
-    "progress": 50
+    "updatedAt": "2026-03-20T05:17:43.747Z",
+    "progress": 86
   }
 ]
