@@ -76,6 +76,22 @@ export interface Metadata {
   provider?: string; // 'claude' | 'groq' | 'gemini' | 'template'
 }
 
+// ─── Subtitle configuration ─────────────────────────────────────────────────
+
+export type SubtitleStyle = 'word_by_word' | 'sentence';
+export type SubtitleSize = 'small' | 'medium' | 'large';
+export type SubtitleBackground = 'none' | 'dark' | 'solid';
+export type SubtitlePosition = 'bottom' | 'center' | 'top';
+
+export interface SubtitleConfig {
+  enabled: boolean;
+  style: SubtitleStyle;
+  fontSize: SubtitleSize;
+  background: SubtitleBackground;
+  position: SubtitlePosition;
+  accentColor?: string;
+}
+
 export interface ProjectPayload {
   projectId: string;
   title: string;
@@ -85,6 +101,7 @@ export interface ProjectPayload {
   language: string;
   script: ProjectScript;
   metadata: Metadata;
+  subtitleConfig?: SubtitleConfig;
 }
 
 export interface Job {

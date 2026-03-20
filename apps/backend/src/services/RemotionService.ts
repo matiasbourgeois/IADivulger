@@ -10,7 +10,7 @@ export class RemotionService {
       projectId: payload.projectId,
       title: payload.title,
       description: payload.description,
-      format: (payload.formats && payload.formats.includes('9:16') ? '9:16' : '16:9') as '16:9' | '9:16',
+      format: (payload.formats && payload.formats.includes('9:16') ? '9:16' : payload.formats && payload.formats.includes('1:1') ? '1:1' : '16:9') as '16:9' | '9:16' | '1:1',
       scenes: payload.script.scenes.map(s => ({
         sceneId: s.sceneId,
         type: s.type || 'video',
@@ -31,7 +31,7 @@ export class RemotionService {
 
     const transformedPayload = this.transformPayloadForRemotion(payload);
     const format = transformedPayload.format;
-    const compositionId = format === '9:16' ? 'IADivulger-Portrait' : 'IADivulger-Landscape';
+    const compositionId = format === '9:16' ? 'IADivulger-Portrait' : format === '1:1' ? 'IADivulger-Square' : 'IADivulger-Landscape';
 
     // ── APPROACH: Generate a Root file with the actual payload baked in ──────
     // Remotion 4.0.0 does NOT inject inputProps into the component when no
@@ -69,8 +69,8 @@ export const RemotionRoot = () => (
       id="${compositionId}"
       component={MainVideo}
       fps={30}
-      width={${format === '9:16' ? 1080 : 1920}}
-      height={${format === '9:16' ? 1920 : 1080}}
+      width={${format === '16:9' ? 1920 : 1080}}
+      height={${format === '16:9' ? 1080 : format === '9:16' ? 1920 : 1080}}
       durationInFrames={${totalFrames}}
       defaultProps={{ payload: PAYLOAD, format: '${format}' }}
     />

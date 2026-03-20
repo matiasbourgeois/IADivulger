@@ -1,29 +1,35 @@
 // @ts-nocheck — Remotion JSX types resolve at bundle time, not IDE
 import React from 'react';
-import { AbsoluteFill, Audio, Img, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
-import { RenderScene } from '../types/schema';
+import { AbsoluteFill, Audio, Img, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { RenderScene, SubtitleConfig } from '../types/schema';
+import { Subtitles } from './Subtitles';
 
 interface Props {
   scene: RenderScene;
+  subtitleConfig?: SubtitleConfig;
 }
 
+const toRgba = (hex: string, alpha: number) => {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+};
+
 /**
- * ImageScene — renders a FLUX-generated still image with camera effects.
+ * ImageScene — renders a FLUX-generated or Pexels web image with premium camera effects.
  *
- * Effects:
- *   zoom_in   — slow zoom from 1.0→1.25
- *   zoom_out  — slow zoom from 1.25→1.0
- *   pan_left  — horizontal slide right→center
- *   pan_right — horizontal slide left→center
- *   ken_burns — zoom_in + slight pan (cinematic)
+ * Effects: zoom_in, zoom_out, pan_left, pan_right, ken_burns
  */
-export const ImageScene: React.FC<Props> = ({ scene }) => {
+export const ImageScene: React.FC<Props> = ({ scene, subtitleConfig }) => {
   const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
+  const { durationInFrames, fps } = useVideoConfig();
 
   const effect = scene.imageEffect || 'ken_burns';
   const assetUrl = scene.assetUrl ?? '';
-  const hasImage = assetUrl.startsWith('http');
+  const hasImage = assetUrl.startsWith('http') || assetUrl.startsWith('/') || assetUrl.startsWith('data:');
+  const accent = '#6366f1';
 
   // ── Camera effect calculations ──────────────────────────────────────────
   const progress = interpolate(frame, [0, durationInFrames], [0, 1], { extrapolateRight: 'clamp' });
@@ -55,11 +61,14 @@ export const ImageScene: React.FC<Props> = ({ scene }) => {
   }
 
   // ── Fade in/out ─────────────────────────────────────────────────────────
-  const fadeIn = interpolate(frame, [0, 12], [0, 1], { extrapolateRight: 'clamp' });
-  const fadeOut = interpolate(frame, [durationInFrames - 12, durationInFrames], [1, 0], { extrapolateLeft: 'clamp' });
+  const fadeIn = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+  const fadeOut = interpolate(frame, [durationInFrames - 10, durationInFrames], [1, 0], { extrapolateLeft: 'clamp' });
   const opacity = fadeIn * fadeOut;
 
-  const subtitleOpacity = interpolate(frame, [0, 20], [0, 1], { extrapolateRight: 'clamp' });
+  // ── Subtitle animation ─────────────────────────────────────────────────
+  const subtitleSpring = spring({ frame, fps, config: { damping: 14, stiffness: 70 }, delay: 8 });
+  const subtitleY = interpolate(subtitleSpring, [0, 1], [20, 0]);
+  const subtitleOpacity = interpolate(frame, [5, 22], [0, 1], { extrapolateRight: 'clamp' });
 
   return (
     <AbsoluteFill style={{ background: '#000', opacity }}>
@@ -82,64 +91,49 @@ export const ImageScene: React.FC<Props> = ({ scene }) => {
       ) : (
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'linear-gradient(135deg, #0f172a, #1e1b4b)',
+          background: 'linear-gradient(135deg, #0f172a, #1e1b4b, #0f172a)',
         }} />
       )}
 
       {/* Cinematic vignette */}
       <div style={{
         position: 'absolute', inset: 0,
-        background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%)',
+        background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%)',
         pointerEvents: 'none',
       }} />
 
-      {/* Bottom gradient for subtitle readability */}
+      {/* Bottom gradient — heavier for subtitle readability */}
       <div style={{
         position: 'absolute', inset: 0,
-        background: 'linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.6) 100%)',
+        background: 'linear-gradient(to bottom, transparent 45%, rgba(0,0,0,0.7) 85%, rgba(0,0,0,0.85) 100%)',
         pointerEvents: 'none',
       }} />
 
-      {/* Subtitle */}
-      {scene.narrationText && (
-        <AbsoluteFill style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 80px 68px' }}>
-          <div style={{
-            background: 'rgba(0,0,0,0.55)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 14,
-            padding: '20px 34px',
-            maxWidth: 1180,
-            opacity: subtitleOpacity,
-          }}>
-            <p style={{
-              color: '#fff',
-              fontSize: 32,
-              fontWeight: 700,
-              textAlign: 'center',
-              lineHeight: 1.35,
-              margin: 0,
-              textShadow: '0 2px 8px rgba(0,0,0,0.4)',
-            }}>
-              {scene.narrationText}
-            </p>
-          </div>
-        </AbsoluteFill>
-      )}
+      {/* Top subtle gradient */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), transparent 25%)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* Subtitles (replaces old manually-styled subtitle) */}
+      <Subtitles text={scene.narrationText || ''} config={subtitleConfig} />
 
       {/* Watermark */}
       <div style={{
         position: 'absolute', top: 36, left: 46,
-        display: 'flex', alignItems: 'center', gap: 10, opacity: 0.32,
+        display: 'flex', alignItems: 'center', gap: 10, opacity: 0.25,
       }}>
         <div style={{
-          width: 26, height: 26, background: '#6366f1', borderRadius: 7,
+          width: 26, height: 26, borderRadius: 8,
+          background: 'linear-gradient(135deg, #6366f1, #818cf8)',
           color: '#fff', fontWeight: 900, fontSize: 10,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 10px rgba(99,102,241,0.3)',
         }}>IA</div>
         <span style={{
           color: '#fff', fontWeight: 800, fontSize: 12,
-          letterSpacing: '3px', textTransform: 'uppercase',
+          letterSpacing: '4px', textTransform: 'uppercase',
         }}>IADivulger</span>
       </div>
 
@@ -147,9 +141,10 @@ export const ImageScene: React.FC<Props> = ({ scene }) => {
       {scene.sourceUrls && scene.sourceUrls.length > 0 && (
         <div style={{
           position: 'absolute', top: 36, right: 46,
-          background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)',
-          borderRadius: 8, padding: '6px 12px',
-          opacity: 0.5,
+          background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)',
+          borderRadius: 10, padding: '6px 14px',
+          border: '1px solid rgba(255,255,255,0.06)',
+          opacity: interpolate(frame, [20, 35], [0, 0.5], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
         }}>
           <span style={{ color: '#94a3b8', fontSize: 10, fontWeight: 600 }}>
             📎 {scene.sourceUrls.length} fuente{scene.sourceUrls.length > 1 ? 's' : ''}
@@ -157,8 +152,8 @@ export const ImageScene: React.FC<Props> = ({ scene }) => {
         </div>
       )}
 
-      {/* Audio */}
-      {scene.audioUrl && scene.audioUrl.length > 4 && <Audio src={scene.audioUrl} />}
+      {/* Audio — delay 3 frames to fix audio starting before visual */}
+      {scene.audioUrl && scene.audioUrl.length > 4 && <Audio src={scene.audioUrl} startFrom={3} />}
 
     </AbsoluteFill>
   );

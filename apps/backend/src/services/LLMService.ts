@@ -76,14 +76,15 @@ interface SceneDistribution {
  */
 function computeDistribution(durationMinutes: number): SceneDistribution {
   // Breakpoint table: [minutes, totalScenes, slides, videos, images, webImages, avgWords, videoWords]
+  // Max 10s per scene → more scenes, more dynamic
   const table: [number, number, number, number, number, number, number, number][] = [
-    [1,  6,  2,  1,  1,  2,  40,  15],
-    [2,  10, 3,  1,  2,  4,  50,  15],
-    [3,  14, 4,  1,  3,  6,  55,  15],
-    [5,  20, 5,  2,  4,  9,  60,  20],
-    [7,  24, 7,  2,  5,  10, 70,  20],
-    [10, 30, 8,  2,  6,  14, 75,  25],
-    [15, 40, 12, 2,  8,  18, 80,  25],
+    [1,  10, 3,  1,  1,  5,  20,  12],
+    [2,  16, 4,  1,  2,  9,  22,  12],
+    [3,  20, 5,  1,  3,  11, 22,  15],
+    [5,  30, 7,  2,  5,  16, 22,  15],
+    [7,  40, 9,  2,  7,  22, 22,  15],
+    [10, 55, 12, 3,  8,  32, 25,  15],
+    [15, 80, 18, 3,  10, 49, 25,  15],
   ];
 
   // Find surrounding breakpoints for interpolation
@@ -115,7 +116,7 @@ function computeDistribution(durationMinutes: number): SceneDistribution {
   }
 
   // Fallback
-  return { totalScenes: 14, slides: 4, videos: 1, images: 3, webImages: 6, avgNarrationWords: 55, videoNarrationWords: 15 };
+  return { totalScenes: 20, slides: 5, videos: 1, images: 3, webImages: 11, avgNarrationWords: 22, videoNarrationWords: 15 };
 }
 
 // Export for frontend preview endpoint
@@ -148,12 +149,28 @@ EJEMPLOS DE APERTURAS VARIADAS (usá una DIFERENTE cada vez, NO repitas la misma
 - NUNCA uses exclamaciones excesivas (máximo 1 por escena)
 
 🟢 CITAS Y FUENTES — REGLA CRÍTICA DE VERACIDAD:
-- SOLO podés citar fuentes que aparecen en la sección "DATOS REALES DE LA WEB" de abajo.
-- Si una fuente NO está en esa sección, NO la cites. NUNCA inventes nombres de medios (Infobae, La Nación, CNN, etc.) a menos que aparezcan en los datos web.
-- Cuando uses datos de la sección web, citá el nombre del medio exacto que aparece ahí: "según [nombre del medio]"
-- Si querés mencionar un dato general sin fuente web, usá frases genéricas: "según estudios recientes", "los expertos coinciden en", "datos disponibles indican"
-- Agregá el campo "sourceUrls" SOLO con URLs que aparecen en la sección de datos web. Si no hay URL, dejá el array vacío: []
-- 🔴 NUNCA inventes URLs. Es PREFERIBLE no citar fuente a inventar una falsa.`
+
+🔴🔴🔴 LISTA NEGRA DE FUENTES INVENTADAS — NUNCA LAS MENCIONES:
+- NUNCA digas "según Infobae", "según La Nación", "según CNN", "según BBC", "según Forbes", "según Nature", "según MIT"
+- NUNCA inventes que un medio publicó algo A MENOS que la URL de ese medio aparezca en DATOS REALES DE LA WEB
+- Si una fuente NO está en la sección de datos web, ESTÁ PROHIBIDO mencionarla por nombre
+
+✅ FRASES PERMITIDAS (usá estas en vez de inventar fuentes):
+- "Según los datos disponibles..."
+- "Los investigadores descubrieron que..."
+- "Los estudios más recientes indican..."
+- "Los expertos coinciden en que..."
+- "Los científicos confirmaron que..."
+- "De acuerdo con las observaciones..."
+
+❌ EJEMPLO MALO: "Según Infobae, el James Webb descubrió una nueva galaxia"
+✅ EJEMPLO BUENO: "Los científicos confirmaron que el James Webb descubrió una nueva galaxia"
+
+❌ EJEMPLO MALO: "Según La Nación, los investigadores analizaron 37 horas de datos"
+✅ EJEMPLO BUENO: "Los investigadores analizaron más de 37 horas de datos del telescopio"
+
+- Agregá "sourceUrls" SOLO con URLs verificadas de la sección de datos web. Array vacío [] si no hay.
+- 🔴 NUNCA inventes URLs ni nombres de medios. PREFERIBLE no citar fuente que inventar una falsa.`
     : `LANGUAGE: Conversational English, professional science communicator.
 TONE: Smart friend explaining something over coffee. Authoritative but approachable. NOT hype YouTuber.
 
@@ -203,19 +220,20 @@ Generá exactamente ${dist.totalScenes} escenas con esta distribución OBLIGATOR
 - EXACTAMENTE ${dist.webImages} escena(s) tipo "web_image" (foto REAL de Pexels con efecto de cámara)
 
 🔴 NO generes más slides reemplazando imágenes. La distribución es OBLIGATORIA.
-🔴 Cada escena debe durar MÁXIMO 20 segundos. Si una narración es larga, dividila en 2 escenas.
+🔴 MÁXIMO 10 SEGUNDOS por escena. Narraciones CORTAS de máximo 25 palabras.
+🔴 Si querés decir algo largo, DIVIDILO en 2-3 escenas de 8-10s cada una.
 
-DURACIÓN POR ESCENA:
-- Cada slide: narración de ${dist.avgNarrationWords}-${dist.avgNarrationWords + 20} palabras (~${Math.round(dist.avgNarrationWords / 2.5)}-${Math.round((dist.avgNarrationWords + 20) / 2.5)}s)
-- Cada video: narración de ${dist.videoNarrationWords}-${dist.videoNarrationWords + 10} palabras (~7-10s)
-- Cada imagen/web_image: narración de 30-60 palabras (~10-20s)
+DURACIÓN POR ESCENA (MÁXIMO 10s CADA UNA):
+- Cada slide: narración de ${dist.avgNarrationWords}-25 palabras (~8-10s)
+- Cada video: narración de ${dist.videoNarrationWords} palabras (~6-8s)
+- Cada imagen/web_image: narración de 15-25 palabras (~8-10s)
 - TOTAL debe sumar ~${totalSeconds}s
 
 Distribución OBLIGATORIA (seguí este orden, intercalando tipos):
-1. SLIDE apertura (gancho fuerte, style "title") — MAX 15s
+1. SLIDE PORTADA (style "title") — OBLIGATORIO: La narración debe PRESENTAR el tema al espectador. Decile de qué va a tratar el video y por qué le importa. Ejemplo: "Hoy te cuento los 5 descubrimientos más impactantes del telescopio James Webb que están cambiando todo lo que sabíamos del universo.". NO arranques con datos o cifras, primero enganchá al espectador. MAX 10s.
 2. WEB_IMAGE o VIDEO — visual impactante
 3-${dist.totalScenes - 1}. Alterná: SLIDE → WEB_IMAGE → SLIDE → IMAGE → WEB_IMAGE → SLIDE (nunca 2 slides seguidos)
-Último: SLIDE cierre/CTA (style "transition") — MAX 12s
+Último: SLIDE cierre/CTA (style "transition") — MAX 10s
 
 ═══════════════════════════════════════════════════════════
 REGLAS CRÍTICAS (si violás alguna, el guión es INÚTIL)
@@ -227,9 +245,16 @@ REGLAS CRÍTICAS (si violás alguna, el guión es INÚTIL)
 - NUNCA bullet points genéricos como "El concepto central" o "Cómo funciona". Cada bullet debe ser un DATO ESPECÍFICO.
 - NUNCA duraciones de más de 15 segundos para narraciones de menos de 30 palabras.
 
+🔵 PRONUNCIACIÓN DE PALABRAS EN INGLÉS:
+La narración será leída por un TTS en español. Para que las palabras en inglés se pronuncien correctamente:
+- En el campo "narration": escribí las palabras inglesas FONÉTICAMENTE en español. Ejemplos: "Steam" → "Stim", "Deep Learning" → "Dip Lérning", "Unreal Engine" → "Anríal Ényin", "Open Source" → "Ópen Sors", "Rendering" → "Réndering", "Game Engine" → "Gueim Ényin".
+- En los campos "headline", "bulletPoints", "bodyText": dejá las palabras en inglés como están (se ven en pantalla, no se leen en voz alta).
+- Nombres propios universales como "James Webb", "NASA", "Tesla", "NVIDIA" van igual en ambos campos.
+
 🟢 OBLIGATORIO:
-- Cada narración de slide DEBE tener entre 40-120 palabras con información REAL y ESPECÍFICA del tema.
-- Cada narración de video DEBE tener 15-30 palabras, impactante y con transición.
+- La narración de la ESCENA 1 (portada, style "title") debe PRESENTAR el tema: decir de qué trata el video y generar curiosidad. NO incluir datos duros en la portada. Entre 15-25 palabras.
+- Las narraciones de las DEMÁS slides DEBEN tener entre 15-25 palabras con información REAL y ESPECÍFICA del tema.
+- Cada narración de video DEBE tener 12-20 palabras, impactante y con transición.
 - Los bullet points deben ser DATOS CONCRETOS (ej: "Procesa 1M tokens de contexto" en vez de "Mayor capacidad")
 - Los headlines deben ser CORTOS y DESCRIPTIVOS (ej: "Ventana de Contexto" no "¿Qué es la ventana de contexto de GPT 5.4?")
 - durationSeconds = ceil(cantidad_de_palabras_de_la_narración / 2.5) — calcular SIEMPRE así.
@@ -314,7 +339,7 @@ Respondé ÚNICAMENTE con JSON válido. Sin markdown, sin explicaciones, sin tex
       "narration": "string — 15-30 palabras, transición impactante",
       "durationSeconds": 8,
       "sourceUrls": ["https://ejemplo.com/fuente"],
-      "visualPrompt": "Photo of [SUJETO REAL Y CONCRETO], [ángulo de cámara], [iluminación], shot on Canon R5, 8K, photorealistic"
+      "visualPrompt": "Photo of [SUJETO REAL Y CONCRETO], [ángulo de cámara], [iluminación], shot on Canon R5, 8K, photorealistic, NO TEXT NO WORDS NO LETTERS"
     },
     {
       "type": "image",
@@ -366,15 +391,18 @@ Son MÁS RÁPIDAS que generar con IA y dan un toque de realismo al video.
 
 ⚠ REGLAS FINALES (VIOLACIÓN = GUIÓN RECHAZADO):
 - "visualPrompt" es OBLIGATORIO para TODAS las escenas type "video". Sin visualPrompt, el video NO SE GENERA.
+- 🔴 NUNCA pongas texto, letras, palabras, carteles, títulos ni subtítulos en el "visualPrompt" ni en "imagePrompt". Wan 2.2 NO sabe dibujar texto.
+- Siempre agregá "NO TEXT NO WORDS NO LETTERS" al final de cada visualPrompt e imagePrompt.
 - "imagePrompt" es OBLIGATORIO para TODAS las escenas type "image". Sin imagePrompt, la imagen NO SE GENERA.
 - "webImageUrl" es OBLIGATORIO para TODAS las escenas type "web_image". Usá las URLs de la sección FOTOS REALES.
 - "sourceUrls" SOLO debe contener URLs de la sección "DATOS REALES DE LA WEB". Si no hay URLs verificadas, usá array vacío [].
 - CADA escena DEBE empezar con una apertura DIFERENTE. VARIÁ el estilo narrativo.
 - El TONO debe ser de divulgador científico: informate, con autoridad, pero cercano. NUNCA sensacionalista.
 - 🔴 RESPETÁ la cantidad EXACTA de escenas de cada tipo. NO reemplaces web_image con slides.
-- 🔴 Cada escena dura MÁXIMO 20 segundos. Dividí narraciones largas.
+- 🔴 Cada escena dura MÁXIMO 10 SEGUNDOS. Cada narración tiene MÁXIMO 25 PALABRAS.
 - 🔴 NUNCA inventes fuentes que no aparecen en los datos web verificados.
-- 🔴 NUNCA pongas 2 slides seguidos. Alterná con imágenes entre medio.`;
+- 🔴 NUNCA pongas 2 slides seguidos. Alterná con imágenes entre medio.
+- 🔴 Si necesitás explicar algo largo, DIVIDILO en 2 escenas cortas.`;
 }
 
 // ─── API Callers ──────────────────────────────────────────────────────────────
@@ -566,17 +594,28 @@ function parseJSON(raw: string): LLMScriptResponse {
 // ─── Post-processing: fix durations, enforce quality ──────────────────────────
 
 function postProcess(script: LLMScriptResponse): LLMScriptResponse {
+  // ── Source names that LLMs commonly invent (not from web search) ──
+  const FAKE_SOURCES_REGEX = /[Ss]eg[úu]n\s+(Infobae|La\s*Naci[óo]n|Clar[íi]n|CNN|BBC|Forbes|Nature|MIT|Science|Reuters|Bloomberg|El\s*Pa[íi]s|The\s*Guardian|The\s*New\s*York\s*Times|Washington\s*Post|El\s*Mundo|TN|Telef[ée]|C5N|A24)(,|\s)/gi;
+  const GENERIC_REPLACEMENT = 'Según los datos disponibles$2';
+
   for (const scene of script.scenes) {
-    // Fix duration based on actual word count (~2.5 words per second for narration)
+    // ── Sanitize fake source citations from narration ──
+    const originalNarration = scene.narration;
+    scene.narration = scene.narration.replace(FAKE_SOURCES_REGEX, GENERIC_REPLACEMENT);
+    if (scene.narration !== originalNarration) {
+      console.log(`[PostProcess] 🧹 Stripped fake sources from scene narration`);
+    }
+
+    // ── Fix duration based on actual word count (~2.5 words/sec) ──
     const wordCount = scene.narration.split(/\s+/).length;
     const calculatedDuration = Math.ceil(wordCount / 2.5);
 
     if (scene.type === 'video') {
-      // Video scenes: min 6s, max 10s
-      scene.durationSeconds = Math.max(6, Math.min(10, calculatedDuration));
+      // Video scenes: min 5s, max 8s
+      scene.durationSeconds = Math.max(5, Math.min(8, calculatedDuration));
     } else {
-      // Presentation scenes: min 8s, max 60s
-      scene.durationSeconds = Math.max(8, Math.min(60, calculatedDuration));
+      // All other scenes: min 6s, max 10s (HARD CAP)
+      scene.durationSeconds = Math.max(6, Math.min(10, calculatedDuration));
     }
 
     // Trim slide headlines that are too long (>50 chars)
@@ -817,7 +856,7 @@ export async function generateScript(opts: GenerateOptions): Promise<ProjectPayl
     process.env.PEXELS_API_KEY
       ? (async () => {
           console.log(`[LLM] 🖼 Pexels search: "${opts.topic}"`);
-          const { photos } = await PexelsService.getPhotosForTopic(opts.topic, 8);
+          const { photos } = await PexelsService.getPhotosForTopic(opts.topic, 15);
           if (photos.length > 0) {
             console.log(`[LLM] ✅ Pexels: ${photos.length} photos`);
             return PexelsService.formatForPrompt(photos);
@@ -884,7 +923,117 @@ export async function generateScript(opts: GenerateOptions): Promise<ProjectPayl
 
   console.log(`[LLM] Provider: ${provider} | Topic: "${opts.topic}" | Scenes: ${scriptData.scenes.length}`);
 
-  // ── Build final payload ─────────────────────────────────────────────────
+  // ── Enforce web_image distribution ──────────────────────────────────────
+  // LLMs often ignore web_image instructions and generate too many slides.
+  // If Pexels photos are available, convert excess slides to web_images.
+  const dist = computeDistribution(opts.durationMinutes);
+  const currentWebImages = scriptData.scenes.filter((s: LLMScene) => s.type === 'web_image').length;
+  const neededWebImages = Math.max(0, dist.webImages - currentWebImages);
+
+  if (neededWebImages > 0 && pexelsContext) {
+    // Extract Pexels URLs from context
+    const pexelsUrlMatches = pexelsContext.match(/URL:\s*(https:\/\/images\.pexels\.com\/[^\s]+)/g) || [];
+    const pexelsUrls = pexelsUrlMatches
+      .map((m: string) => m.replace('URL: ', '').trim())
+      .filter((u: string) => !scriptData.scenes.some((s: LLMScene) => s.webImageUrl === u));
+
+    if (pexelsUrls.length > 0) {
+      let converted = 0;
+      for (let i = 0; i < scriptData.scenes.length && converted < neededWebImages && converted < pexelsUrls.length; i++) {
+        const s = scriptData.scenes[i] as LLMScene;
+        // Only convert non-essential slides (not title, not transition, not first, not last)
+        if (s.type === 'presentation' && i > 0 && i < scriptData.scenes.length - 1) {
+          const style = s.slide?.style || '';
+          if (style !== 'title' && style !== 'transition') {
+            s.type = 'web_image';
+            s.webImageUrl = pexelsUrls[converted];
+            s.imageEffect = ['ken_burns', 'zoom_in', 'zoom_out', 'pan_left', 'pan_right'][converted % 5] as any;
+            // Remove slide data since it's now a web_image
+            delete (s as any).slide;
+            converted++;
+            console.log(`[PostProcess] 🔄 Converted slide ${i + 1} → web_image (Pexels)`);
+          }
+        }
+      }
+      if (converted > 0) {
+        console.log(`[PostProcess] ✅ Enforced ${converted} web_image scenes from Pexels`);
+      }
+    }
+  }
+
+  // Log final distribution
+  const typeCounts: Record<string, number> = {};
+  scriptData.scenes.forEach((s: LLMScene) => { typeCounts[s.type] = (typeCounts[s.type] || 0) + 1; });
+  console.log(`[LLM] Final distribution: ${JSON.stringify(typeCounts)}`);
+
+  // ── Validate sourceUrls — strip any URLs the LLM invented ──────────────
+  // Extract all real URLs from the web context that was provided to the LLM
+  const verifiedUrls = new Set<string>();
+  if (combinedWebContext) {
+    const urlMatches = combinedWebContext.match(/https?:\/\/[^\s"'<>\]]+/g) || [];
+    urlMatches.forEach(u => verifiedUrls.add(u.replace(/[.,;:)}\]]+$/, '')));
+  }
+
+  let strippedCount = 0;
+  for (const scene of scriptData.scenes) {
+    if (scene.sourceUrls && scene.sourceUrls.length > 0) {
+      const original = scene.sourceUrls.length;
+      scene.sourceUrls = scene.sourceUrls.filter((url: string) => {
+        // Keep ONLY exact URL matches — domain matching lets invented URLs through
+        return verifiedUrls.has(url);
+      });
+      strippedCount += original - scene.sourceUrls.length;
+    }
+  }
+  if (strippedCount > 0) {
+    console.log(`[PostProcess] 🧹 Stripped ${strippedCount} invented sourceUrls (kept only verified)`);
+  }
+
+  // ── Hard enforce: cap ALL scene durations at 10s, trim narrations to 25 words ─
+  for (const scene of scriptData.scenes) {
+    // Cap narration at 25 words
+    if (scene.narration) {
+      const words = scene.narration.split(/\s+/);
+      if (words.length > 25) {
+        scene.narration = words.slice(0, 25).join(' ') + '.';
+        console.log(`[PostProcess] ✂ Trimmed narration to 25 words for scene type=${scene.type}`);
+      }
+    }
+    // Recalculate duration from word count (2.5 words/sec), then hard cap at 10s
+    if (scene.narration) {
+      const wordCount = scene.narration.split(/\s+/).length;
+      const calculatedDur = Math.ceil(wordCount / 2.5);
+      scene.durationSeconds = Math.min(10, Math.max(3, calculatedDur));
+    } else {
+      scene.durationSeconds = Math.min(10, scene.durationSeconds || 7);
+    }
+  }
+
+  // ── Force scene 1 to be a "title" slide ────────────────────────────────────
+  // LLMs frequently ignore the instruction to make the first scene a title/intro.
+  // We enforce it here: if scene 1 is not a presentation with style "title", fix it.
+  if (scriptData.scenes.length > 0) {
+    const first = scriptData.scenes[0];
+    if (first.type !== 'presentation' || !first.slide || first.slide.style !== 'title') {
+      console.log(`[PostProcess] 🔧 Forcing scene 1 to title slide (was type=${first.type}, style=${first.slide?.style || 'N/A'})`);
+      first.type = 'presentation';
+      if (!first.slide) {
+        first.slide = {
+          headline: scriptData.title || 'Video',
+          style: 'title',
+          bodyText: scriptData.description || '',
+        };
+      } else {
+        first.slide.style = 'title';
+      }
+      // Remove non-presentation fields
+      delete (first as any).imagePrompt;
+      delete (first as any).visualPrompt;
+      delete (first as any).webImageUrl;
+      delete (first as any).imageEffect;
+    }
+  }
+
   const scenes: Scene[] = scriptData.scenes.map((s: LLMScene, idx: number) => ({
     sceneId: `s${idx + 1}`,
     type: s.type as SceneType,
